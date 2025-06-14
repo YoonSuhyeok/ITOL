@@ -1,29 +1,9 @@
-import { CommandItem } from "@/components/ui/command";
 
-import { useEffect, useState, useCallback, useRef, memo } from "react"
-import {
-  Check,
-  ChevronDown,
-  Play,
-  X,
-  Save,
-  ChevronUp,
-  ChevronRight,
-  ChevronsUpDown,
-  Code,
-  Link,
-  Hammer,
-  Copy,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandList } from "@/components/ui/command"
-import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { memo } from "react"
 import { cn } from "@/shared/lib/utils";
 import { Handle, Position } from "@xyflow/react";
+import { Button } from "@/shared/components/ui/button";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@radix-ui/react-tooltip";
 
 function FileNode({id, type, data}: any) {
   let filename = 'Test';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ReactFlow } from '@xyflow/react';
- 
+
 import '@xyflow/react/dist/style.css';
 import fileNode from '@/entities/language/ui/file-node';
 
