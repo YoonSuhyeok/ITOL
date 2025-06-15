@@ -4,8 +4,10 @@ import { cn } from "@/shared/lib/utils";
 import { Handle, Position } from "@xyflow/react";
 import { Button } from "@/shared/components/ui/button";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@radix-ui/react-tooltip";
+import NodeType from "@/shared/types/node-type";
+import FileNodeData from "../model/file-type";
 
-function FileNode({id, type, data}: any) {
+function FileNode({id, type, data}: NodeType<FileNodeData>) {
   let filename = 'Test';
 
   return (
