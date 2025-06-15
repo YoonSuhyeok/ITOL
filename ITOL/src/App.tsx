@@ -1,5 +1,4 @@
 import { ReactFlow } from "@xyflow/react";
-import React from "react";
 
 import "@xyflow/react/dist/style.css";
 import fileNode from "@/entities/language/ui/file-node";
@@ -15,7 +14,11 @@ const initialNodes = [
 		type: "languageNode",
 		id: "1",
 		position: { x: 0, y: 0 },
-		data: { label: "1" },
+		data: {
+			label: "1",
+			fileName: "example",
+			fileExtension: "ts",
+		},
 	},
 	{ id: "2", position: { x: 0, y: 100 }, data: { label: "2" } },
 ];

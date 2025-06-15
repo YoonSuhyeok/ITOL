@@ -13,6 +13,7 @@
 		"format": "biome format"
 	},
 	"dependencies": {
+		"@microlink/react-json-view": "^1.26.2",
 		"@radix-ui/react-checkbox": "^1.3.2",
 		"@radix-ui/react-dialog": "^1.1.14",
 		"@radix-ui/react-popover": "^1.1.14",

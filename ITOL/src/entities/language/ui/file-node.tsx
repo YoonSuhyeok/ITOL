@@ -18,9 +18,11 @@ import {
 	Save,
 	X,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, useState } from "react";
 import type FileNodeData from "../model/file-type";
 import FileViewModel from "../model/file-view-model";
+import { Badge } from "@/shared/components/ui/badge";
+import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 
 const handleSave = () => {};
 
@@ -28,7 +30,6 @@ const handleRun = () => {};
 const handleBuild = () => {};
 
 function FileNode({ id, type, data }: NodeType<FileNodeData>) {
-	const filename = "Test";
 	const {
 		isRunning,
 		isSaving,
@@ -43,6 +44,9 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 		isBuilding,
 		setIsBuilding,
 	} = FileViewModel();
+	const [requestType, setRequestType] = useState()
+	const [responseType, setResponseType] = useState()
+	
 	return (
 		<div
 			className={cn(
@@ -68,6 +72,7 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					/>
 				</div>
 			)}
+
 			{/* 헤더 */}
 			<div className="flex items-center p-2 border-b bg-muted/30">
 				<div className="flex items-center gap-1">
@@ -81,7 +86,7 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					</div>
 				</div>
 
-				<div className="ml-4 text-sm font-medium">{filename}</div>
+				<div className="ml-4 text-sm font-medium">{data.fileName}</div>
 
 				<div className="ml-auto flex items-center gap-1">
 					<TooltipProvider>
@@ -194,11 +199,36 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					</Button>
 				</div>
 			</div>
-
+			{/* 타입 정의 표시 (TypeScript 노드에서만 표시) */}
+			{!isNodeMinimized && data.fileExtension === "ts" && showTypeDefinition && (
+				<div className="p-3 bg-gray-50 border-b text-xs font-mono">
+				<div className="mb-2">
+					<Badge variant="outline" className="mb-1">
+					Request Type
+					</Badge>
+					<pre className="bg-gray-100 p-2 rounded overflow-auto">
+					{renderTypeDefinition(requestType)}
+					</pre>
+				</div>
+				<div>
+					<Badge variant="outline" className="mb-1">
+					Response Type
+					</Badge>
+					<pre className="bg-gray-100 p-2 rounded overflow-auto">
+					{renderTypeDefinition(responseType)}
+					</pre>
+				</div>
+				</div>
+			)}
 			{/* 입력 핸들 */}
 			<Handle
 				type="target"
 				position={Position.Left}
+				style={{ background: "#555", width: 8, height: 8 }}
+			/>
+			<Handle
+				type="target"
+				position={Position.Right}
 				style={{ background: "#555", width: 8, height: 8 }}
 			/>
 		</div>
