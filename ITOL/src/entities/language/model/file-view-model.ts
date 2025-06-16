@@ -33,6 +33,7 @@ const FileViewModel = () => {
 		setRunSuccess,
 		filename,
 		setFilename,
+		isParameterSectionCollapsed,
 		setIsParameterSectionCollapsed,
 		isNodeMinimized,
 		setIsNodeMinimized,
