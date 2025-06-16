@@ -2,100 +2,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@radix-ui/react-popover
 import { useCallback, useState } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronsUpDown, X } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command";
 import { Input } from "./ui/input";
 
 import Parameter from "../types/node-parameter-type";
+import ReuqestBody from "../types/request-type";
 import { cn } from "../lib/utils";
 import { Checkbox } from "./ui/checkbox";
-import RequestBody from "../types/request-type";
 
 function getShortNodeId(nodeId: string): string {
-  return nodeId.length > 6 ? nodeId.substring(0, 6) + "..." : nodeId
+    return nodeId.length > 6 ? nodeId.substring(0, 6) + "..." : nodeId
 }
 
 // 키 선택 처리
 function handleKeySelect(paramId: string, key: string, type: string, setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setOpenKeyPopover: React.Dispatch<React.SetStateAction<string | null>>) {
-  // 파라미터 업데이트
-  setParameters((prev) =>
-    prev.map((param) =>
-      param.id === paramId
-        ? {
-          ...param,
-          key,
-          type,
-          checked: true,
-        }
-        : param,
-    )
-  )
-
-  // 팝오버 닫기
-  setOpenKeyPopover(null)
-}
-
-function handleValueSourceChange(paramId: string, source: "manual" | "linked", setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>) {
-  setParameters((prev) =>
-    prev.map((param) =>
-      param.id === paramId
-        ? {
-          ...param,
-          valueSource: source,
-          // 직접 입력 모드로 변경 시 연결 정보 초기화
-          ...(source === "manual"
-            ? { sourceNodeId: undefined, sourceNodeLabel: undefined, sourcePath: undefined }
-            : {}),
-        }
-        : param,
-    ),
-  )
-}
-
-// 파라미터 삭제 함수
-function deleteParameter(id: string, setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>) {
-  setParameters((prev) => prev.filter((param) => param.id !== id))
-}
-
-const ParameterForm = ({
-  isParameterSectionCollapsed,
-  parent_parameters
-}: {
-  isParameterSectionCollapsed: boolean;
-  parent_parameters: Parameter[];
-}) => {
-
-  const [parameters, setParameters] = useState<Parameter[]>([]);
-  const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
-  const [requestTypes, setRequestTypes] = useState<RequestBody>({
-    properties: [{
-      key: "exampleKey",
-      value: "exampleValue",
-      type: "string",
-      description: "This is an example key"
-    }],
-  });
-
-    const addParameter = useCallback(() => {
-    setParameters((prev) => [
-      ...prev,
-      { id: `param${prev.length + 1}`, key: "", value: "", valueSource: "manual", checked: false, type: "" },
-    ])
-}, [])
-  const handleParameterChange = useCallback((id: string, field: keyof Parameter, value: any) => {
-    setParameters((prev) => prev.map((param) => (param.id === id ? { ...param, [field]: value } : param)))
-  }, []);
-
-  // 키 선택 드롭다운 열기/닫기 처리
-  const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
-    if (open) {
-      setOpenKeyPopover(paramId)
-    } else {
-      setOpenKeyPopover(null)
-    }
-  }, [])
-
-    const handleKeySelect = useCallback((paramId: string, key: string, type: string) => {
     // 파라미터 업데이트
     setParameters((prev) =>
       prev.map((param) =>
@@ -107,56 +28,143 @@ const ParameterForm = ({
               checked: true,
             }
           : param,
-      ),
+      )
     )
 
     // 팝오버 닫기
     setOpenKeyPopover(null)
-  }, [])
-  // 값 입력 모드 변경 처리
-  const handleValueSourceChange = useCallback((paramId: string, source: "manual" | "linked") => {
+}
+
+function handleValueSourceChange(paramId: string, source: "manual" | "linked", setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>) {
+    // setParameters((prev) =>
+    //   prev.map((param) =>
+    //     param.id === paramId
+    //       ? {
+    //           ...param,
+    //           valueSource: source,
+    //           // 직접 입력 모드로 변경 시 연결 정보 초기화
+    //           ...(source === "manual"
+    //             ? { sourceNodeId: undefined, sourceNodeLabel: undefined, sourcePath: undefined }
+    //             : {}),
+    //         }
+    //       : param,
+    //   ),
+    // )
+}
+
+  // 파라미터 삭제 함수
+function deleteParameter(id: string, parameters: Parameter[], setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>) {
+    setParameters((prev) => prev.filter((param) => param.id !== id));
+
+    if(parameters.length === 0) {
+      setIsParameterSectionCollapsed(false); // 파라미터가 없으면 섹션을 최소화
+    }
+}
+
+const ParameterForm = ({
+    isParameterSectionCollapsed,
+    setIsParameterSectionCollapsed,
+    parent_parameters
+}: {
+    isParameterSectionCollapsed: boolean;
+    setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+    parent_parameters: {
+        id: string;
+        key: string;
+        value: string;
+        type?: string;
+        checked: boolean;
+        valueSource?: "linked" | "static";
+        sourcePath?: string;
+    }[];
+}) => {
+    
+    const [parameters, setParameters] = useState<Parameter[]>([
+      {
+        	id: '1',
+          enabled: false,
+          key: null,
+          value: null,
+          checked: false,
+          type: 'string',
+          valueSource: "dynamic",
+          sourcePath:  '',
+          sourceNodeLabel: '',
+          sourceNodeId: '',
+      }
+    ]);
+    const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
+    const [requestType, setRequestType] = useState<ReuqestBody>();
+
+    // 키 선택 드롭다운 열기/닫기 처리
+    const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
+        if (open) {
+        setOpenKeyPopover(paramId)
+        } else {
+        setOpenKeyPopover(null)
+        }
+    }, [])
+
+  const paramTypes = ["string", "number"] as const;
+
+  // 각 파라미터별 type 팝오버 열기 상태 (param.id 또는 null)
+  const [openTypePopover, setOpenTypePopover] = useState<string | null>(null);
+
+  // type 선택 핸들러
+  const handleTypeSelect = (paramId: string, type: string) => {
     setParameters((prev) =>
-      prev.map((param) =>
-        param.id === paramId
+      prev.map((p) =>
+        p.id === paramId
           ? {
-              ...param,
-              valueSource: source,
-              // 직접 입력 모드로 변경 시 연결 정보 초기화
-              ...(source === "manual"
-                ? { sourceNodeId: undefined, sourceNodeLabel: undefined, sourcePath: undefined }
-                : {}),
+              ...p,
+              type,
             }
-          : param,
-      ),
-    )
+          : p
+      )
+    );
+    setOpenTypePopover(null);
+  };
+
+  const handleParameterChange = useCallback(
+    (id: string, field: keyof Parameter, value: any) => {
+      setParameters((prev) =>
+        prev.map((param) => (param.id === id ? { ...param, [field]: value } : param))
+      );
+    },
+    []
+  );
+  const addParameter = useCallback(() => {
+    setParameters((prev) => [
+      ...prev,
+      { id: `param${prev.length + 1}`, key: "", value: "", valueSource: "manual", checked: false, type: "" },
+    ])
   }, [])
-  return (
-    <div>
-      {!isParameterSectionCollapsed && (
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <div
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <h3 className="text-lg font-medium">Parameter</h3>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={addParameter}>
-                Add Parameter
-              </Button>
-            </div>
-          </div>
-
-          {!isParameterSectionCollapsed && (
-            <div className="border rounded-md">
-              {/* 헤더 행 */}
-              <div className="grid grid-cols-[40px_1fr_1fr_40px] border-b">
-                <div className="p-3"></div>
-                <div className="p-3 font-medium">Key</div>
-                <div className="p-3 font-medium">Value</div>
-                <div className="p-3"></div>
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-4">
+              <div
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setIsParameterSectionCollapsed(!isParameterSectionCollapsed)}
+              >
+                {isParameterSectionCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <h3 className="text-lg font-medium">Parameter</h3>
               </div>
-
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={addParameter}>
+                  Add Parameter
+                </Button>
+              </div>
+            </div>
+            {!isParameterSectionCollapsed && (
+                <div className="border rounded-md">
+                    {/* 헤더 행 */}
+                    <div className="grid grid-cols-[40px_1fr_1fr_40px] border-b">
+                    <div className="p-3"></div>
+                    <div className="p-3 font-medium">Key</div>
+                    <div className="p-3 font-medium">Value</div>
+                    <div className="p-3"></div>
+                </div>
+                    
               {/* 파라미터 행 */}
               {parameters.map((param) => (
                 <div key={param.id} className="grid grid-cols-[40px_1fr_1fr_40px] border-b last:border-b-0">
@@ -167,9 +175,7 @@ const ParameterForm = ({
                     />
                   </div>
                   <div className="p-2">
-                    {/* TypeScript 노드에서만 키 선택 드롭다운 표시 */}
-                    {requestTypes ? (
-                      <Popover
+                    <Popover
                         open={openKeyPopover === param.id}
                         onOpenChange={(open) => handleKeyPopoverOpenChange(param.id, open)}
                       >
@@ -177,45 +183,42 @@ const ParameterForm = ({
                           <Button variant="outline" role="combobox" className="w-full justify-between">
                             <div className="flex items-center">
                               {param.key || "Select key..."}
-                              {param.type && (
-                                <Badge variant="outline" className="ml-2 text-xs">
-                                  {param.type}
-                                </Badge>
-                              )}
                             </div>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0 border border-solid border-gray">
+                        <PopoverContent className="w-[300px] p-0">
                           <Command>
                             <CommandInput placeholder="Search key..." />
                             <CommandList>
-                              <CommandEmpty>No key found.</CommandEmpty>
+                              <CommandEmpty>
+                                <Input></Input>
+                              </CommandEmpty>
                               <CommandGroup>
-                                {requestTypes &&
-                                  requestTypes.properties.map(requestType => (
+                                {requestType &&
+                                  Object.entries(requestType.properties).map(([key, prop]) => (
                                     <CommandItem
-                                      key={requestType.key}
-                                      value={requestType.value}
-                                      onSelect={() => handleKeySelect(param.id, requestType.key, requestType.type)}
+                                      key={key}
+                                      value={key}
+                                      onSelect={() => handleKeySelect(param.id, key, prop.type, setParameters, setOpenKeyPopover)}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center">
                                           <Check
                                             className={cn(
                                               "mr-2 h-4 w-4",
-                                              param.key === requestType.key ? "opacity-100" : "opacity-0",
+                                              param.key === key ? "opacity-100" : "opacity-0",
                                             )}
                                           />
-                                          {requestType.key}
-                                          {requestType.description && (
+                                          {key}
+                                          {prop.description && (
                                             <span className="ml-2 text-xs text-muted-foreground">
-                                              {requestType.description}
+                                              {prop.description}
                                             </span>
                                           )}
                                         </div>
                                         <Badge variant="outline" className="text-xs">
-                                          {requestType.type}
+                                          {prop.type}
                                         </Badge>
                                       </div>
                                     </CommandItem>
@@ -225,16 +228,8 @@ const ParameterForm = ({
                           </Command>
                         </PopoverContent>
                       </Popover>
-                    ) : (
-                      <Input
-                        placeholder="Key"
-                        value={param.key}
-                        onChange={(e) => handleParameterChange(param.id, "key", e.target.value)}
-                        className="w-full"
-                      />
-                    )}
                   </div>
-                  <div className="p-2">
+              <div className="p-2">
                     {/* 값 입력 부분을 단일 입력 필드로 변경 */}
                     <div className="relative">
                       {param.valueSource === "linked" && param.sourcePath ? (
@@ -253,7 +248,7 @@ const ParameterForm = ({
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6"
-                              onClick={() => handleValueSourceChange(param.id, "manual")}
+                              onClick={() => handleValueSourceChange(param.id, "manual", setParameters)}
                             >
                               <X className="h-3 w-3" />
                             </Button>
@@ -268,7 +263,6 @@ const ParameterForm = ({
                             className="w-full"
                           />
                           
-                          
                         </div>
                       )}
                     </div>
@@ -278,70 +272,17 @@ const ParameterForm = ({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteParameter(param.id, setParameters)}
+                      onClick={() => deleteParameter(param.id, parameters, setParameters, setIsParameterSectionCollapsed)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 }
 
 export default ParameterForm;
-
-
-// {getEdges().some((edge) => edge.target === id) && availableResponseValues.length > 0 && (
-//                             <Popover>
-//                               <PopoverTrigger asChild>
-//                                 <Button variant="outline" size="icon" className="ml-1 h-9 w-9">
-//                                   <Link className="h-4 w-4" />
-//                                 </Button>
-//                               </PopoverTrigger>
-//                               <PopoverContent className="w-[300px] p-0">
-//                                 <Command>
-//                                   <CommandInput placeholder="Search value..." />
-//                                   <CommandList>
-//                                     <CommandEmpty>No value found.</CommandEmpty>
-//                                     {/* 노드별로 그룹화하여 표시 */}
-//                                     {/* {Object.entries(sourceNodes).map(([nodeId, nodeInfo]) => (
-//                                       <CommandGroup key={nodeId} heading={`${nodeInfo.label} (${nodeInfo.filename})`}>
-//                                         {availableResponseValues
-//                                           .filter((valueInfo) => valueInfo.nodeId === nodeId)
-//                                           .map((valueInfo, index) => (
-//                                             <CommandItem
-//                                               key={`${nodeId}-${index}`}
-//                                               value={`${nodeId}-${valueInfo.path}`}
-//                                               onSelect={() => handleValueSelect(param.id, valueInfo)}
-//                                             >
-//                                               <div className="flex items-center justify-between w-full">
-//                                                 <div className="flex items-center">
-//                                                   <Check
-//                                                     className={cn(
-//                                                       "mr-2 h-4 w-4",
-//                                                       param.sourcePath === valueInfo.path &&
-//                                                         param.sourceNodeId === valueInfo.nodeId
-//                                                         ? "opacity-100"
-//                                                         : "opacity-0",
-//                                                     )}
-//                                                   />
-//                                                   <span className="truncate">{valueInfo.path}</span>
-//                                                 </div>
-//                                                 <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-//                                                   {valueInfo.displayValue}
-//                                                 </span>
-//                                               </div>
-//                                             </CommandItem>
-//                                           ))}
-//                                       </CommandGroup>
-//                                     ))} */}
-//                                   </CommandList>
-//                                 </Command>
-//                               </PopoverContent>
-//                             </Popover>
-//                           )}

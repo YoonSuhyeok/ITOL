@@ -24,16 +24,6 @@ import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
-import { Node } from "@xyflow/react";
-import { DagServiceInstance } from "@/features/dag/services/dag.service";
-const handleSave = async () => {
-	// Simulate save logic
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(true); // Simulate successful save
-		}, 1000);
-	});
-};
 
 const handleRun = async () => {
 	// Simulate save logic
@@ -60,8 +50,12 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 		isSaving,
 		setIsSaving,
 		runSuccess,
+<<<<<<< HEAD
 		parameters,
 		isParameterSectionCollapsed,
+=======
+		isParameterSectionCollapsed,			
+>>>>>>> 9daab49 (feat 파라미터 생성 폼 UI 생성)
 		setIsParameterSectionCollapsed,
 		isNodeMinimized,
 		setIsNodeMinimized,
@@ -72,6 +66,7 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 		isBuilding,
 		setIsBuilding,
 	} = FileViewModel();
+<<<<<<< HEAD
 	const [requestType, setRequestType] = useState<Record<string, any>>({
 		type: "object",
 		properties: {
@@ -81,6 +76,11 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 	})
 	const [responseType, setResponseType] = useState<Record<string, any>>()
 	
+=======
+	const [requestType, setRequestType] = useState()
+	const [responseType, setResponseType] = useState()
+
+>>>>>>> 9daab49 (feat 파라미터 생성 폼 UI 생성)
 	return (
 		<div
 			className={cn(
@@ -272,13 +272,13 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 				</div>
 				</div>
 			)}
-			{!isNodeMinimized && 
-				<ParameterForm
-					isParameterSectionCollapsed={isParameterSectionCollapsed}
-					parent_parameters={parameters}>
+			 {!isNodeMinimized && (
+				<ParameterForm 
+				isParameterSectionCollapsed={isParameterSectionCollapsed}
+				setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
+				parent_parameters={[]}>
 				</ParameterForm>
-			}
-
+			 )}
 			{/* 입력 핸들 */}
 			<Handle
 				type="target"
