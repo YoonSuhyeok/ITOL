@@ -7,7 +7,7 @@ const FileViewModel = () => {
 	const [runSuccess, setRunSuccess] = useState<boolean | null>(null);
 	const [filename, setFilename] = useState<string>("");
 
-	const [parameters, setParameters] = useState<Parameter[]>();
+	const [parameters, setParameters] = useState<Parameter[]>([]);
 
 	// 파라미터 섹션 최소화 상태 추가
 	const [isParameterSectionCollapsed, setIsParameterSectionCollapsed] =
@@ -33,6 +33,8 @@ const FileViewModel = () => {
 		setRunSuccess,
 		filename,
 		setFilename,
+		parameters,
+		isParameterSectionCollapsed,
 		setIsParameterSectionCollapsed,
 		isNodeMinimized,
 		setIsNodeMinimized,

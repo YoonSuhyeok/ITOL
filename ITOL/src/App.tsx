@@ -1,4 +1,4 @@
-import { ReactFlow } from "@xyflow/react";
+import { Background, ReactFlow } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 import fileNode from "@/entities/language/ui/file-node";
@@ -20,7 +20,7 @@ const initialNodes = [
 			fileExtension: "ts",
 		},
 	},
-	{ id: "2", position: { x: 0, y: 100 }, data: { label: "2" } },
+	// { id: "2", position: { x: 0, y: 100 }, data: { label: "2" } },
 ];
 
 const initialEdges = [{ id: "e1-2", source: "1", target: "2" }];
@@ -32,7 +32,9 @@ export default function App() {
 				nodeTypes={nodeTypes}
 				nodes={initialNodes}
 				edges={initialEdges}
-			/>
+			>
+				<Background />
+			</ReactFlow>
 		</div>
 	);
 }

@@ -1,12 +1,12 @@
 
-interface RequestPoroperty {
+interface RequestProperty {
     key: string;
     value: string;
     type: "string" | "number" | "boolean" | "object" | "array";
     description: string;
 }
-interface ReuqestBody {
-	properties: RequestPoroperty[];
+interface RequestBody {
+	properties: RequestProperty[];
 }
 
-export default ReuqestBody;
+export default RequestBody;

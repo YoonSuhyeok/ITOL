@@ -23,6 +23,7 @@ import type FileNodeData from "../model/file-type";
 import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
+import ParameterForm from "@/shared/components/parameter";
 
 const handleSave = () => {};
 
@@ -34,6 +35,8 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 		isRunning,
 		isSaving,
 		runSuccess,
+		parameters,
+		isParameterSectionCollapsed,
 		setIsParameterSectionCollapsed,
 		isNodeMinimized,
 		setIsNodeMinimized,
@@ -220,6 +223,13 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 				</div>
 				</div>
 			)}
+			{!isNodeMinimized && 
+				<ParameterForm
+					isParameterSectionCollapsed={isParameterSectionCollapsed}
+					parent_parameters={parameters}>
+				</ParameterForm>
+			}
+
 			{/* 입력 핸들 */}
 			<Handle
 				type="target"
