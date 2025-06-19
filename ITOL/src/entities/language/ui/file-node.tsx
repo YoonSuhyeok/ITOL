@@ -25,15 +25,39 @@ import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
 
-const handleSave = () => {};
+const handleSave = async () => {
+	// Simulate save logic
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true); // Simulate successful save
+		}, 1000);
+	});
+};
 
-const handleRun = () => {};
-const handleBuild = () => {};
+const handleRun = async () => {
+	// Simulate save logic
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true); // Simulate successful save
+		}, 1000);
+	});
+};
+
+const handleBuild = async () => {
+	// Simulate save logic
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true); // Simulate successful save
+		}, 1000);
+	});
+};
 
 function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 	const {
 		isRunning,
+		setIsRunning,
 		isSaving,
+		setIsSaving,
 		runSuccess,
 		parameters,
 		isParameterSectionCollapsed,
@@ -47,15 +71,22 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 		isBuilding,
 		setIsBuilding,
 	} = FileViewModel();
-	const [requestType, setRequestType] = useState()
-	const [responseType, setResponseType] = useState()
+	const [requestType, setRequestType] = useState<Record<string, any>>({
+		type: "object",
+		properties: {
+			param1: { type: "string" },
+			param2: { type: "number" },
+		},
+	})
+	const [responseType, setResponseType] = useState<Record<string, any>>()
 	
 	return (
 		<div
 			className={cn(
 				"bg-background border rounded-md shadow-md w-[500px] relative before:absolute before:inset-[-2px] before:rounded-lg before:bg-black/50 before:blur-[2px] before:-z-10",
-				(isRunning || isSaving) &&
+				(isBuilding || isRunning || isSaving) &&
 					"ring-2 ring-offset-2 ring-offset-background transition-all",
+				isBuilding && "via-amber-400",
 				isRunning && "ring-blue-500",
 				isSaving && "ring-amber-500",
 				runSuccess === true && "ring-green-500",
@@ -68,8 +99,9 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					<div
 						className={cn(
 							"absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer",
+							isBuilding && "via-amber-400",
 							isRunning && "via-blue-400",
-							isSaving && "via-amber-400",
+							isSaving && "via-amber-400"
 						)}
 						style={{ backgroundSize: "200% 100%" }}
 					/>
@@ -143,7 +175,11 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 								"h-8 w-8 relative",
 								isBuilding && "bg-amber-100 text-amber-600",
 							)}
-							onClick={handleBuild}
+							onClick={async () => {
+								setIsBuilding(true);
+								await handleBuild();
+								setIsBuilding(false);
+							}}
 							disabled={isBuilding}
 						>
 							{isBuilding ? (
@@ -162,7 +198,11 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 							runSuccess === true && "bg-green-100 text-green-600",
 							runSuccess === false && "bg-red-100 text-red-600",
 						)}
-						onClick={handleRun}
+						onClick={async () => {
+							setIsRunning(true);
+							await handleRun();
+							setIsRunning(false);
+						}}
 						disabled={isRunning}
 					>
 						{isRunning ? (
@@ -178,8 +218,16 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					<Button
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8 relative"
-						onClick={handleSave}
+						className={cn(
+							"h-8 w-8 relative",
+							isSaving && "bg-amber-100 text-amber-600",
+							saveSuccess && "bg-green-100 text-green-600",
+						)}
+						onClick={async () => {
+							setIsSaving(true);
+							await handleSave();
+							setIsSaving(false);
+						}}
 						disabled={isSaving}
 					>
 						{isSaving ? (
