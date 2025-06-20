@@ -1,13 +1,12 @@
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
-import type NodeType from "@/shared/types/node-type";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
 } from "@radix-ui/react-tooltip";
-import { Handle, NodeProps, Position } from "@xyflow/react";
+import { Handle, NodeProps, Position, Node, useEdgesState, MarkerType } from "@xyflow/react";
 import {
 	Check,
 	ChevronDown,
@@ -24,6 +23,7 @@ import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
+import { DagServiceInstance } from "@/features/dag/services/dag.service";
 
 const handleRun = async () => {
 	// Simulate save logic
@@ -43,19 +43,15 @@ const handleBuild = async () => {
 	});
 };
 
-function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
-	const {
+function FileNode({ data, setEdges }: NodeProps<Node<FileNodeData>>) {
+
+  const {
 		isRunning,
 		setIsRunning,
 		isSaving,
 		setIsSaving,
 		runSuccess,
-<<<<<<< HEAD
-		parameters,
-		isParameterSectionCollapsed,
-=======
 		isParameterSectionCollapsed,			
->>>>>>> 9daab49 (feat 파라미터 생성 폼 UI 생성)
 		setIsParameterSectionCollapsed,
 		isNodeMinimized,
 		setIsNodeMinimized,
@@ -66,21 +62,9 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 		isBuilding,
 		setIsBuilding,
 	} = FileViewModel();
-<<<<<<< HEAD
-	const [requestType, setRequestType] = useState<Record<string, any>>({
-		type: "object",
-		properties: {
-			param1: { type: "string" },
-			param2: { type: "number" },
-		},
-	})
-	const [responseType, setResponseType] = useState<Record<string, any>>()
-	
-=======
 	const [requestType, setRequestType] = useState()
 	const [responseType, setResponseType] = useState()
 
->>>>>>> 9daab49 (feat 파라미터 생성 폼 UI 생성)
 	return (
 		<div
 			className={cn(
@@ -285,7 +269,20 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 				position={Position.Left}
 				style={{ background: "#555", width: 8, height: 8 }}
 				onConnect={(params) => {
-					DagServiceInstance.addEdge(params.target, params.source);
+					const sourceId = params.source;
+          const targetId = params.target;
+          setEdges((eds) => [
+            ...eds,
+            {
+              id: `${sourceId}-${targetId}`,
+              source: sourceId,
+              target: targetId,
+              type: "default",
+              animated: true,
+              label: `Edge from ${sourceId} to ${targetId}`,
+              markerEnd: { type: MarkerType.ArrowClosed },
+            }
+          ]);
 				}}
 			/>
 			<Handle
@@ -293,7 +290,20 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 				position={Position.Right}
 				style={{ background: "#555", width: 8, height: 8 }}
 				onConnect={(params) => {
-					DagServiceInstance.addEdge(params.target, params.source);
+          const sourceId = params.source;
+          const targetId = params.target;
+          setEdges((eds) => [
+            ...eds,
+            {
+              id: `${sourceId}-${targetId}`,
+              source: sourceId,
+              target: targetId,
+              type: "default",
+              animated: true,
+              label: `Edge from ${sourceId} to ${targetId}`,
+              markerEnd: { type: MarkerType.ArrowClosed },
+            }
+          ]);
 				}}
 			/>
 		</div>

@@ -1,4 +1,4 @@
-import { Background, ReactFlow, Node } from "@xyflow/react";
+import { Background, ReactFlow, Node, useNodesState, useEdgesState } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 import fileNode from "@/entities/language/ui/file-node";
@@ -6,16 +6,22 @@ import fileNode from "@/entities/language/ui/file-node";
 import "./App.css";
 import { DagServiceInstance } from "./features/dag/services/dag.service";
 import type FileNodeData from "@/entities/language/model/file-type";
-
-const nodeTypes = {
-	languageNode: fileNode,
-};
+import FileNode from "@/entities/language/ui/file-node";
 
 export default function App() {
 
-	const nodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
-	const edges = DagServiceInstance.getEdgeData();
-	console.log("Edges:", edges);
+	// const nodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
+	// const edges = DagServiceInstance.getEdgeData();
+
+	const [nodes, setNodes, onNodesChange] = useNodesState(DagServiceInstance.getNodeData());
+	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
+
+	const nodeTypes = {
+		languageNode: (props) => (
+			<FileNode {...props} edges={edges} setEdges={setEdges} />
+		),
+	};
+	
 	return (
 		<div style={{ width: "100vw", height: "100vh" }}>
 			<ReactFlow
@@ -24,7 +30,7 @@ export default function App() {
 				edges={edges}
 				onNodesChange={onNodesChange}
 				onEdgesChange={onEdgesChange}
-				onConnect={onConnect}
+				// onConnect={onConnect}
 			>
 				<Background />
 			</ReactFlow>
