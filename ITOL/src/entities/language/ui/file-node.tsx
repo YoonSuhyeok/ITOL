@@ -52,7 +52,7 @@ const handleBuild = async () => {
 	});
 };
 
-function FileNode(props: NodeProps<Node<FileNodeData>>) {
+function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 	const {
 		isRunning,
 		setIsRunning,
