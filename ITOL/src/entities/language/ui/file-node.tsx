@@ -25,6 +25,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
 import { Node } from "@xyflow/react";
+import { DagServiceInstance } from "@/features/dag/services/dag.service";
 const handleSave = async () => {
 	// Simulate save logic
 	return new Promise((resolve) => {
@@ -283,11 +284,17 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 				type="target"
 				position={Position.Left}
 				style={{ background: "#555", width: 8, height: 8 }}
+				onConnect={(params) => {
+					DagServiceInstance.addEdge(params.target, params.source);
+				}}
 			/>
 			<Handle
-				type="target"
+				type="source"
 				position={Position.Right}
 				style={{ background: "#555", width: 8, height: 8 }}
+				onConnect={(params) => {
+					DagServiceInstance.addEdge(params.target, params.source);
+				}}
 			/>
 		</div>
 	);

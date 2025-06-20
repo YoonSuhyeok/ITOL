@@ -13,13 +13,18 @@ const nodeTypes = {
 
 export default function App() {
 
-	const initialNodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
-	
+	const nodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
+	const edges = DagServiceInstance.getEdgeData();
+	console.log("Edges:", edges);
 	return (
 		<div style={{ width: "100vw", height: "100vh" }}>
 			<ReactFlow
 				nodeTypes={nodeTypes}
-				nodes={initialNodes}
+				nodes={nodes}
+				edges={edges}
+				onNodesChange={onNodesChange}
+				onEdgesChange={onEdgesChange}
+				onConnect={onConnect}
 			>
 				<Background />
 			</ReactFlow>
