@@ -7,7 +7,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@radix-ui/react-tooltip";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, NodeProps, Position } from "@xyflow/react";
 import {
 	Check,
 	ChevronDown,
@@ -24,7 +24,7 @@ import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
-
+import { Node } from "@xyflow/react";
 const handleSave = async () => {
 	// Simulate save logic
 	return new Promise((resolve) => {
@@ -52,7 +52,7 @@ const handleBuild = async () => {
 	});
 };
 
-function FileNode({ id, type, data }: NodeType<FileNodeData>) {
+function FileNode(props: NodeProps<Node<FileNodeData>>) {
 	const {
 		isRunning,
 		setIsRunning,
@@ -293,4 +293,4 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 	);
 }
 
-export default memo(FileNode);
+export default FileNode;
