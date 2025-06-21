@@ -6,7 +6,10 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@radix-ui/react-tooltip";
-import { Handle, NodeProps, Position, Node, useEdgesState, MarkerType } from "@xyflow/react";
+import { Handle, NodeProps, Position, Node, useEdgesState, MarkerType, 
+  useNodesData,
+  getConnectedEdges
+ } from "@xyflow/react";
 import {
 	Check,
 	ChevronDown,
@@ -26,7 +29,9 @@ import ParameterForm from "@/shared/components/parameter";
 import { DagServiceInstance } from "@/features/dag/services/dag.service";
 
 const handleRun = async () => {
-	// Simulate save logic
+  const nodes = DagServiceInstance.getNodeData();
+  const edges = DagServiceInstance.getEdgeData();
+  console.log("Node", nodes, "Edge", edges);
 	return new Promise((resolve) => {
 		setTimeout(() => {
 			resolve(true); // Simulate successful save
@@ -43,7 +48,7 @@ const handleBuild = async () => {
 	});
 };
 
-function FileNode({ data, setEdges }: NodeProps<Node<FileNodeData>>) {
+function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 
   const {
 		isRunning,
@@ -268,43 +273,11 @@ function FileNode({ data, setEdges }: NodeProps<Node<FileNodeData>>) {
 				type="target"
 				position={Position.Left}
 				style={{ background: "#555", width: 8, height: 8 }}
-				onConnect={(params) => {
-					const sourceId = params.source;
-          const targetId = params.target;
-          setEdges((eds) => [
-            ...eds,
-            {
-              id: `${sourceId}-${targetId}`,
-              source: sourceId,
-              target: targetId,
-              type: "default",
-              animated: true,
-              label: `Edge from ${sourceId} to ${targetId}`,
-              markerEnd: { type: MarkerType.ArrowClosed },
-            }
-          ]);
-				}}
 			/>
 			<Handle
 				type="source"
 				position={Position.Right}
 				style={{ background: "#555", width: 8, height: 8 }}
-				onConnect={(params) => {
-          const sourceId = params.source;
-          const targetId = params.target;
-          setEdges((eds) => [
-            ...eds,
-            {
-              id: `${sourceId}-${targetId}`,
-              source: sourceId,
-              target: targetId,
-              type: "default",
-              animated: true,
-              label: `Edge from ${sourceId} to ${targetId}`,
-              markerEnd: { type: MarkerType.ArrowClosed },
-            }
-          ]);
-				}}
 			/>
 		</div>
 	);

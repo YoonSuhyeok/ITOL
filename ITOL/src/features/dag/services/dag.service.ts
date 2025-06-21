@@ -70,20 +70,9 @@ class DagService {
     return this.graphEdgeData;
   }
 
-  public addEdge(targetId: string, sourceId: string): void {
-    console.log("Adding edge from", sourceId, "to", targetId);
-    const newEdge: Edge = {
-      id: `${sourceId}-${targetId}`,
-      source: sourceId,
-      target: targetId,
-      type: "default",
-      animated: true,
-      label: `Edge from ${sourceId} to ${targetId}`,
-    };
-    // 중복된 id가 있으면 추가하지 않음
-    if (!this.graphEdgeData.some(edge => edge.id === newEdge.id)) {
-      this.graphEdgeData.push(newEdge);
-    }
+  public setEdgeData(edges: any): void {
+    this.graphEdgeData = edges;
+    console.log("Edge data updated:", this.graphEdgeData);
   }
 
   public updateDagData(data: any): void {

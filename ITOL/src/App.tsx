@@ -1,4 +1,4 @@
-import { Background, ReactFlow, Node, useNodesState, useEdgesState } from "@xyflow/react";
+import { Background, ReactFlow, Node, useNodesState, useEdgesState, addEdge, MarkerType } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 import fileNode from "@/entities/language/ui/file-node";
@@ -7,6 +7,11 @@ import "./App.css";
 import { DagServiceInstance } from "./features/dag/services/dag.service";
 import type FileNodeData from "@/entities/language/model/file-type";
 import FileNode from "@/entities/language/ui/file-node";
+import { useCallback } from "react";
+
+const nodeTypes = {
+	languageNode: FileNode
+};
 
 export default function App() {
 
@@ -15,13 +20,23 @@ export default function App() {
 
 	const [nodes, setNodes, onNodesChange] = useNodesState(DagServiceInstance.getNodeData());
 	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
+	const onConnect = useCallback(
+		(connection) => {
+		  setEdges((oldEdges) => {
+			const newEdges = addEdge(
+			  {
+				...connection,
+				markerEnd: { type: MarkerType.ArrowClosed },
+			  },
+			  oldEdges
+			);
+			DagServiceInstance.setEdgeData(newEdges); // 서비스에 동기화
+			return newEdges;
+		  });
+		},
+		[setEdges]
+	  );
 
-	const nodeTypes = {
-		languageNode: (props) => (
-			<FileNode {...props} edges={edges} setEdges={setEdges} />
-		),
-	};
-	
 	return (
 		<div style={{ width: "100vw", height: "100vh" }}>
 			<ReactFlow
@@ -30,7 +45,7 @@ export default function App() {
 				edges={edges}
 				onNodesChange={onNodesChange}
 				onEdgesChange={onEdgesChange}
-				// onConnect={onConnect}
+				onConnect={onConnect}
 			>
 				<Background />
 			</ReactFlow>
