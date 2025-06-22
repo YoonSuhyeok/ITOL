@@ -17,8 +17,9 @@ export default function App() {
 
 	// const nodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
 	// const edges = DagServiceInstance.getEdgeData();
-
 	const [nodes, setNodes, onNodesChange] = useNodesState(DagServiceInstance.getNodeData());
+	const useNodeStore = useNodesState(nodes);
+
 	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
 	const onConnect = useCallback(
 		(connection) => {

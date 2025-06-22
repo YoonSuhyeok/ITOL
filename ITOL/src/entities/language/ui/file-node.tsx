@@ -20,23 +20,17 @@ import {
 	Save,
 	X,
 } from "lucide-react";
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type FileNodeData from "../model/file-type";
 import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
 import { DagServiceInstance } from "@/features/dag/services/dag.service";
+import { useNodeStore } from "@/shared/store/use-node-store";
 
-const handleRun = async () => {
-  const nodes = DagServiceInstance.getNodeData();
-  const edges = DagServiceInstance.getEdgeData();
-  console.log("Node", nodes, "Edge", edges);
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(true); // Simulate successful save
-		}, 1000);
-	});
+const handleRun = async (nodeId: string) => {
+  DagServiceInstance.runNode(nodeId);
 };
 
 const handleBuild = async () => {
@@ -48,11 +42,9 @@ const handleBuild = async () => {
 	});
 };
 
-function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
-
+function FileNode(node: NodeProps<Node<FileNodeData>>) {
+  const data = node.data as FileNodeData;
   const {
-		isRunning,
-		setIsRunning,
 		isSaving,
 		setIsSaving,
 		runSuccess,
@@ -70,7 +62,10 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 	const [requestType, setRequestType] = useState()
 	const [responseType, setResponseType] = useState()
 
-	return (
+  const { nodeResults } = useNodeStore();
+  const isRunning = nodeResults[node.id]?.status === "running";
+	
+  return (
 		<div
 			className={cn(
 				"bg-background border rounded-md shadow-md w-[500px] relative before:absolute before:inset-[-2px] before:rounded-lg before:bg-black/50 before:blur-[2px] before:-z-10",
@@ -189,9 +184,7 @@ function FileNode({ data }: NodeProps<Node<FileNodeData>>) {
 							runSuccess === false && "bg-red-100 text-red-600",
 						)}
 						onClick={async () => {
-							setIsRunning(true);
-							await handleRun();
-							setIsRunning(false);
+							await handleRun(node.id);
 						}}
 						disabled={isRunning}
 					>
