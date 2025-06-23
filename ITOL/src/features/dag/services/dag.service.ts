@@ -102,39 +102,40 @@ class DagService {
       },
     ];
 
-    for (const edge of this.graphEdgeData) {
-      console.log("Processing edge:", edge);
-      if (!this.indgreeMap.has(edge.target)) {
-        this.indgreeMap.set(edge.target, 0);
-      }
-      this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
-    }
-    console.log("Indegree Map:", this.indgreeMap);
-    for (const node of this.graphNodeData) {
-      if (this.indgreeMap.get(node.id) === undefined) {
-        this.nextNodeQueue.push(node.id);
-      }
-    }
-    console.log("Initial Node Queue:", this.nextNodeQueue);
-    
-    while(this.nextNodeQueue.length > 0) {
-      this.resultFlows.push(this.nextNodeQueue[0])
-      const currentNodeId = this.nextNodeQueue.shift();
-      // edge 조회
-      const outgoingEdges = this.graphEdgeData.filter(edge => edge.source === currentNodeId);
-      for (const edge of outgoingEdges) {
-        if (!this.indgreeMap.has(edge.target)) {
-          this.indgreeMap.set(edge.target, 0);
-        }
-        this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
-      }
-      for (const node of this.graphNodeData) {
-        if (this.indgreeMap.get(node.id) === undefined) {
-          this.nextNodeQueue.push(node.id);
-        }
-      }
-    }
+    // 1. 모든 노드의 indegree를 0으로 초기화
+  this.indgreeMap.clear();
+  for (const node of this.graphNodeData) {
+    this.indgreeMap.set(node.id, 0);
+  }
+  // 2. 모든 엣지의 target indegree +1
+  for (const edge of this.graphEdgeData) {
+    this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
+  }
 
+  // 3. indegree가 0인 노드를 큐에 추가
+  this.nextNodeQueue = [];
+  for (const node of this.graphNodeData) {
+    if (this.indgreeMap.get(node.id) === 0) {
+      this.nextNodeQueue.push(node.id);
+    }
+  }
+
+  // 4. 위상 정렬
+  this.resultFlows = [];
+  while (this.nextNodeQueue.length > 0) {
+    const currentNodeId = this.nextNodeQueue.shift()!;
+    this.resultFlows.push(currentNodeId);
+
+    // outgoing edge의 target indegree -1
+    const outgoingEdges = this.graphEdgeData.filter(edge => edge.source === currentNodeId);
+    for (const edge of outgoingEdges) {
+      this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! - 1);
+      if (this.indgreeMap.get(edge.target) === 0) {
+        this.nextNodeQueue.push(edge.target);
+      }
+    }
+  }
+    console.log("Result Flows:", this.resultFlows);
   }
 
   public static getInstance(): DagService {
