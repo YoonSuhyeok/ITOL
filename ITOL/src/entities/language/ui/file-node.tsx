@@ -259,7 +259,7 @@ function FileNode(node: NodeProps<Node<FileNodeData>>) {
 				<ParameterForm 
 				isParameterSectionCollapsed={isParameterSectionCollapsed}
 				setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
-				parent_parameters={[]}>
+				parent_parameters={data.requestProperties}>
 				</ParameterForm>
 			 )}
 			{/* 입력 핸들 */}

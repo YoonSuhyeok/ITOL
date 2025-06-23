@@ -7,7 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Input } from "./ui/input";
 
 import Parameter from "../types/node-parameter-type";
-import ReuqestBody from "../types/request-type";
+import { RequestBody, RequestProperty} from "../types/request-type";
 import { cn } from "../lib/utils";
 import { Checkbox } from "./ui/checkbox";
 
@@ -68,15 +68,7 @@ const ParameterForm = ({
 }: {
     isParameterSectionCollapsed: boolean;
     setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-    parent_parameters: {
-        id: string;
-        key: string;
-        value: string;
-        type?: string;
-        checked: boolean;
-        valueSource?: "linked" | "static";
-        sourcePath?: string;
-    }[];
+    parent_parameters: RequestProperty[];
 }) => {
     
     const [parameters, setParameters] = useState<Parameter[]>([
@@ -94,7 +86,9 @@ const ParameterForm = ({
       }
     ]);
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
-    const [requestType, setRequestType] = useState<ReuqestBody>();
+    const [requestType, setRequestType] = useState<RequestBody>({
+      properties: parent_parameters
+    });
 
     // 키 선택 드롭다운 열기/닫기 처리
     const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
@@ -187,7 +181,7 @@ const ParameterForm = ({
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0">
+                        <PopoverContent className="w-[300px] p-0 border border-black rounded">
                           <Command>
                             <CommandInput placeholder="Search key..." />
                             <CommandList>
