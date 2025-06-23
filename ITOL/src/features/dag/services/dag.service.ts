@@ -109,6 +109,7 @@ class DagService {
   }
   // 2. 모든 엣지의 target indegree +1
   for (const edge of this.graphEdgeData) {
+    console.log("Processing edge:", edge, "Current Indegree Map:", this.indgreeMap);
     this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
   }
 
@@ -135,6 +136,8 @@ class DagService {
       }
     }
   }
+
+  console.log("Indegree Map:", this.indgreeMap);
     console.log("Result Flows:", this.resultFlows);
   }
 
@@ -232,21 +235,18 @@ class DagService {
   }
 
   public getNextNodeIds(nodeId: string): string[] {
-    // 위상 정렬을 통해 다음 노드 ID를 가져오는 메소드
+    const currentIndex = this.resultFlows.indexOf(nodeId);
     const nextNodeIds: string[] = [];
-    const visited = new Set<string>();
-    const dfs = (currentNodeId: string) => {
-      if (!visited.has(currentNodeId)) {
-        visited.add(currentNodeId);
-        const edgesFromCurrent = this.graphEdgeData.filter(edge => edge.source === currentNodeId);
-        edgesFromCurrent.forEach(edge => {
-          nextNodeIds.push(edge.target);
-          dfs(edge.target);
-        });
+    for(let i=currentIndex + 1; i< this.resultFlows.length; i++) {
+      // node Index 확인
+      const nextNodeId = this.resultFlows[i];
+      // 다음 노드의 indegree가 0인지 확인
+      const nextNodeIndegree = this.indgreeMap.get(nextNodeId);
+      if (nextNodeIndegree !== undefined && nextNodeIndegree === 0) {
+        nextNodeIds.push(nextNodeId);
       }
-    };
-    dfs(nodeId);
-    console.log(`Next node IDs for node ${nodeId}: ${nextNodeIds.join(", ")}`);
+    }
+
     return nextNodeIds;
   }
 
