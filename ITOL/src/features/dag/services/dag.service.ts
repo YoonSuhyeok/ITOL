@@ -16,7 +16,10 @@ class DagService {
   private indgreeMap = new Map<string, number>();
   private nextNodeQueue: string[] = [];
 
-  private resultFlows: string[] = [];
+  private resultFlows: {
+    id: string;
+    indgree: number;
+  }[] = [];
 
   private graphNodeData: Node<FileNodeData>[] = [];
   private graphEdgeData: Edge[] = [
@@ -100,45 +103,20 @@ class DagService {
         label: "Edge from 2 to 4",
         markerEnd: { type: MarkerType.ArrowClosed },
       },
+      {
+        id: "e3-4",
+        source: "3",
+        target: "4",
+        type: "default",
+        animated: true,
+        label: "Edge from 3 to 4",
+        markerEnd: { type: MarkerType.ArrowClosed },
+      },
     ];
 
-    // 1. 모든 노드의 indegree를 0으로 초기화
-  this.indgreeMap.clear();
-  for (const node of this.graphNodeData) {
-    this.indgreeMap.set(node.id, 0);
-  }
-  // 2. 모든 엣지의 target indegree +1
-  for (const edge of this.graphEdgeData) {
-    console.log("Processing edge:", edge, "Current Indegree Map:", this.indgreeMap);
-    this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
-  }
 
-  // 3. indegree가 0인 노드를 큐에 추가
-  this.nextNodeQueue = [];
-  for (const node of this.graphNodeData) {
-    if (this.indgreeMap.get(node.id) === 0) {
-      this.nextNodeQueue.push(node.id);
-    }
-  }
-
-  // 4. 위상 정렬
-  this.resultFlows = [];
-  while (this.nextNodeQueue.length > 0) {
-    const currentNodeId = this.nextNodeQueue.shift()!;
-    this.resultFlows.push(currentNodeId);
-
-    // outgoing edge의 target indegree -1
-    const outgoingEdges = this.graphEdgeData.filter(edge => edge.source === currentNodeId);
-    for (const edge of outgoingEdges) {
-      this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! - 1);
-      if (this.indgreeMap.get(edge.target) === 0) {
-        this.nextNodeQueue.push(edge.target);
-      }
-    }
-  }
-
-  console.log("Indegree Map:", this.indgreeMap);
-    console.log("Result Flows:", this.resultFlows);
+    this.initDagGraph();
+    console.log("Graph Adjacency List:", this.graphAdjacencyList);
   }
 
   public static getInstance(): DagService {
@@ -235,19 +213,8 @@ class DagService {
   }
 
   public getNextNodeIds(nodeId: string): string[] {
-    const currentIndex = this.resultFlows.indexOf(nodeId);
-    const nextNodeIds: string[] = [];
-    for(let i=currentIndex + 1; i< this.resultFlows.length; i++) {
-      // node Index 확인
-      const nextNodeId = this.resultFlows[i];
-      // 다음 노드의 indegree가 0인지 확인
-      const nextNodeIndegree = this.indgreeMap.get(nextNodeId);
-      if (nextNodeIndegree !== undefined && nextNodeIndegree === 0) {
-        nextNodeIds.push(nextNodeId);
-      }
-    }
 
-    return nextNodeIds;
+    return this.topologicalSort(nodeId);
   }
 
   private initDagGraph() {
@@ -263,21 +230,34 @@ class DagService {
     });
   }
 
-  private topologicalSort() {
-    // Perform topological sort on the DAG
-    const sortedNodes: string[] = [];
-    const visited = new Set<string>();
+  /**
+   * Initializes the topological sort by calculating the indegree of each node.
+   */
+  public initTopologicalSort() {
+    // 1. 모든 노드의 indegree를 0으로 초기화
+    this.indgreeMap.clear();
+    for (const node of this.graphNodeData) {
+      this.indgreeMap.set(node.id, 0);
+    }
+    // 2. 모든 엣지의 target indegree +1
+    for (const edge of this.graphEdgeData) {
+      console.log("Processing edge:", edge, "Current Indegree Map:", this.indgreeMap);
+      this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
+    }
+  }
 
-    const visitNode = (nodeId: string) => {
-      if (!visited.has(nodeId)) {
-        visited.add(nodeId);
-        this.graphAdjacencyList.get(nodeId)?.forEach(visitNode);
-        sortedNodes.push(nodeId);
+  private topologicalSort(startNodeId: string): string[] {
+    const childeNodes = this.graphAdjacencyList.get(startNodeId) || [];
+    const nextNodeQueue: string[] = [];
+    for( const childNodeId of childeNodes) {
+      // 현재 노드의 자식 노드의 indegree를 -1
+      this.indgreeMap.set(childNodeId, this.indgreeMap.get(childNodeId)! - 1);
+      // 자식 노드의 indegree가 0이면 다음 노드 큐에 추가
+      if (this.indgreeMap.get(childNodeId) === 0) {
+        nextNodeQueue.push(childNodeId);
       }
-    };
-
-    this.graphNodeData.forEach(node => visitNode(node.id));
-    return sortedNodes.reverse(); // Reverse to get the correct order
+    }
+    return nextNodeQueue;
   }
 }
 

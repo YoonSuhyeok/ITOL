@@ -30,6 +30,7 @@ import { DagServiceInstance } from "@/features/dag/services/dag.service";
 import { useNodeStore } from "@/shared/store/use-node-store";
 
 const handleRun = async (nodeId: string) => {
+  DagServiceInstance.initTopologicalSort(); 
   DagServiceInstance.runNode(nodeId);
 };
 
