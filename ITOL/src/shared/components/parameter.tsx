@@ -17,20 +17,35 @@ function getShortNodeId(nodeId: string): string {
 }
 
 // 키 선택 처리
-function handleKeySelect(paramId: string, key: string, type: string, setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setOpenKeyPopover: React.Dispatch<React.SetStateAction<string | null>>) {
-    // 파라미터 업데이트
-    setParameters((prev) =>
-      prev.map((param) =>
-        param.id === paramId
-          ? {
-              ...param,
-              key,
-              type,
-              checked: true,
-            }
-          : param,
+function handleKeySelect(paramId: string, key: string, type: string, nodeName: string | undefined, setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setOpenKeyPopover: React.Dispatch<React.SetStateAction<string | null>>) {
+    if(nodeName === undefined) {
+      setParameters((prev) =>
+        prev.map((param) =>
+          param.id === paramId
+            ? {
+                ...param,
+                key,
+                type,
+                checked: true,
+              }
+            : param,
+        )
       )
-    )
+    } else  {
+      setParameters((prev) =>
+        prev.map((param) =>
+          param.id === paramId
+            ? {
+                ...param,
+                key,
+                type,
+                checked: true,
+                valueSource: "linked"
+              }
+            : param,
+        )
+      )
+    }
 
     // 팝오버 닫기
     setOpenKeyPopover(null)
@@ -88,6 +103,9 @@ const ParameterForm = ({
           sourceNodeId: '',
       }
     ]);
+
+    console.log("PARAMETERS", parameters);
+
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
     const [requestType, setRequestType] = useState<RequestBody>({
       properties: parent_parameters
@@ -104,7 +122,7 @@ const ParameterForm = ({
           } else {
             requestType.properties.push({
               nodeName: param.nodeName,
-              key: param.key,
+              key: param.nodeName + "_" +param.key,
               value: param.value,
               type: param.type,
               description: param.description || "",
@@ -147,10 +165,11 @@ const ParameterForm = ({
   };
 
   const handleParameterChange = useCallback(
-    (id: string, field: keyof Parameter, value: any) => {
+    (key: string, field: keyof Parameter, value: any) => {
       setParameters((prev) =>
-        prev.map((param) => (param.id === id ? { ...param, [field]: value } : param))
+        prev.map((param) => (param.key === key ? { ...param, [field]: value } : param))
       );
+      console.log(`Parameter ${field} changed for ${key}:`, value);
     },
     []
   );
@@ -159,7 +178,9 @@ const ParameterForm = ({
       ...prev,
       { id: `param${prev.length + 1}`, key: "", value: "", valueSource: "manual", checked: false, type: "" },
     ])
-  }, [])
+  }, []);
+
+
     return (
         <div>
             <div className="flex justify-between items-center mb-4">
@@ -192,7 +213,7 @@ const ParameterForm = ({
                   <div className="flex items-center justify-center">
                     <Checkbox
                       checked={param.checked}
-                      onCheckedChange={(checked) => handleParameterChange(param.id, "checked", checked)}
+                      onCheckedChange={(checked) => handleParameterChange(param.key, "checked", checked)}
                     />
                   </div>
                   <div className="p-2">
@@ -221,7 +242,7 @@ const ParameterForm = ({
                                     <CommandItem
                                       key={key}
                                       value={key}
-                                      onSelect={() => handleKeySelect(param.id, key, prop.type, setParameters, setOpenKeyPopover)}
+                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover)}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center">
@@ -254,27 +275,13 @@ const ParameterForm = ({
               <div className="p-2">
                     {/* 값 입력 부분을 단일 입력 필드로 변경 */}
                     <div className="relative">
-                      {param.valueSource === "linked" && param.sourcePath ? (
-                        <div className="flex items-center">
+                      {param.valueSource === "linked" ? (
+                        <div className="flex">
                           <Input
-                            value={param.value}
-                            onChange={(e) => handleParameterChange(param.id, "value", e.target.value)}
-                            className="w-full pr-24"
-                            readOnly={param.valueSource === "linked"}
+                            value={param.key}
+                            className="w-full"
+                            disabled={param.valueSource === "linked"}
                           />
-                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
-                              {param.sourceNodeLabel || getShortNodeId(param.sourceNodeId || "")}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleValueSourceChange(param.id, "manual", setParameters)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
                         </div>
                       ) : (
                         <div className="flex">
