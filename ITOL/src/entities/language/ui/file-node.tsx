@@ -257,6 +257,7 @@ function FileNode(node: NodeProps<Node<FileNodeData>>) {
 			)}
 			 {!isNodeMinimized && (
 				<ParameterForm 
+				nodeId={node.id}
 				isParameterSectionCollapsed={isParameterSectionCollapsed}
 				setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
 				parent_parameters={data.requestProperties}>

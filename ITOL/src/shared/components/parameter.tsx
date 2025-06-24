@@ -1,5 +1,5 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@radix-ui/react-popover";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Check, ChevronDown, ChevronRight, ChevronsUpDown, X } from "lucide-react";
@@ -10,6 +10,7 @@ import Parameter from "../types/node-parameter-type";
 import { RequestBody, RequestProperty} from "../types/request-type";
 import { cn } from "../lib/utils";
 import { Checkbox } from "./ui/checkbox";
+import { DagServiceInstance } from "@/features/dag/services/dag.service";
 
 function getShortNodeId(nodeId: string): string {
     return nodeId.length > 6 ? nodeId.substring(0, 6) + "..." : nodeId
@@ -62,10 +63,12 @@ function deleteParameter(id: string, parameters: Parameter[], setParameters: Rea
 }
 
 const ParameterForm = ({
+    nodeId,
     isParameterSectionCollapsed,
     setIsParameterSectionCollapsed,
     parent_parameters
 }: {
+    nodeId: string;
     isParameterSectionCollapsed: boolean;
     setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
     parent_parameters: RequestProperty[];
@@ -89,6 +92,30 @@ const ParameterForm = ({
     const [requestType, setRequestType] = useState<RequestBody>({
       properties: parent_parameters
     });
+
+    useEffect(() => {
+      const frontParameters = DagServiceInstance.getFrontNodeParameters(nodeId);
+      if (frontParameters) {
+        // 중복 검사
+        for(const param of frontParameters) {
+          if (requestType.properties.some(p => p.key === param.key && param.nodeName === p.nodeName)) {
+            console.warn(`Parameter with key "${param.key}" already exists.`);
+            continue; // 중복된 키는 무시
+          } else {
+            requestType.properties.push({
+              nodeName: param.nodeName,
+              key: param.key,
+              value: param.value,
+              type: param.type,
+              description: param.description || "",
+            } as RequestProperty);            
+          }
+        }
+        setRequestType({
+          properties: requestType.properties.concat(frontParameters),
+        })
+      }
+    }, [nodeId]);
 
     // 키 선택 드롭다운 열기/닫기 처리
     const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
@@ -204,9 +231,10 @@ const ParameterForm = ({
                                               param.key === key ? "opacity-100" : "opacity-0",
                                             )}
                                           />
-                                          {key}
+                                          {prop.key}
                                           {prop.description && (
                                             <span className="ml-2 text-xs text-muted-foreground">
+                                              {prop.nodeName ? `(${prop.nodeName}) ` : ""}
                                               {prop.description}
                                             </span>
                                           )}

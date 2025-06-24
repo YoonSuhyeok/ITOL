@@ -9,6 +9,7 @@ import { Edge, MarkerType, Node } from "@xyflow/react";
  * This service is designed to be used across the application to ensure consistent access to DAG data.
  */
 class DagService {
+
   private static instance: DagService;
 
   private graphAdjacencyList = new Map<string, string[]>();
@@ -41,6 +42,22 @@ class DagService {
             filePath: "1",
             fileName: "example",
             fileExtension: "ts",
+            requestProperties: [
+              {
+                nodeName: undefined,
+                key: "property1",
+                type: "string",
+                value: null,
+                description: "This is a string property",
+              },
+              {
+                nodeName: undefined,
+                key: "property2",
+                type: "number",
+                value: 42,
+                description: "This is a number property", 
+              },
+            ],
           },
         },
         {
@@ -51,6 +68,22 @@ class DagService {
             filePath: "1",
             fileName: "example2",
             fileExtension: "ts",
+            requestProperties: [
+              {
+                nodeName: undefined,
+                key: "property1",
+                type: "string",
+                value: null,
+                description: "This is a string property",
+              },
+              {
+                nodeName: undefined,
+                key: "property2",
+                type: "number",
+                value: 42,
+                description: "This is a number property", 
+              },
+            ],
           },
         },
         {
@@ -61,6 +94,22 @@ class DagService {
             filePath: "1",
             fileName: "example2-2",
             fileExtension: "ts",
+            requestProperties: [
+              {
+                nodeName: undefined,
+                key: "property1",
+                type: "string",
+                value: null,
+                description: "This is a string property",
+              },
+              {
+                nodeName: undefined,
+                key: "property2",
+                type: "number",
+                value: 42,
+                description: "This is a number property", 
+              },
+            ],
           },
         },
         {
@@ -71,6 +120,22 @@ class DagService {
             filePath: "1",
             fileName: "example3",
             fileExtension: "ts",
+            requestProperties: [
+              {
+                nodeName: undefined,
+                key: "property1",
+                type: "string",
+                value: null,
+                description: "This is a string property",
+              },
+              {
+                nodeName: undefined,
+                key: "property2",
+                type: "number",
+                value: 42,
+                description: "This is a number property", 
+              },
+            ],
           },
         }
     ];
@@ -258,6 +323,28 @@ class DagService {
       }
     }
     return nextNodeQueue;
+  }
+
+  public getFrontNodeParameters(targetNodeId: string) {
+    const frontNodes = this.graphEdgeData
+      .filter(edge => edge.target === targetNodeId)
+      .map(edge => edge.source);
+    
+    const parameters = [];
+    for(const frontNode of frontNodes) {
+      const node = this.graphNodeData.find(n => n.id === frontNode);
+      if (node) {
+        node.data.requestProperties.forEach(param => {
+          parameters.push({
+            ...param,
+            nodeName: node.data.fileName,
+          });
+        });
+      }
+    }
+
+    console.log("Front Node Parameters:", parameters);
+    return parameters;
   }
 }
 
