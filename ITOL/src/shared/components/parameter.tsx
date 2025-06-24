@@ -103,37 +103,21 @@ const ParameterForm = ({
           sourceNodeId: '',
       }
     ]);
+    const [frontParameters, setFrontParameters] = useState<Parameter[]>([]);
+
+    useEffect(() => {
+      const frontParameters = DagServiceInstance.getFrontNodeParameters(nodeId);
+      setFrontParameters(frontParameters);
+    }, [nodeId]);
 
     console.log("PARAMETERS", parameters);
 
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
+
+    const [openValuePopover, setOpenValuePopover] = useState<string | null>(null);
     const [requestType, setRequestType] = useState<RequestBody>({
       properties: parent_parameters
     });
-
-    useEffect(() => {
-      const frontParameters = DagServiceInstance.getFrontNodeParameters(nodeId);
-      if (frontParameters) {
-        // 중복 검사
-        for(const param of frontParameters) {
-          if (requestType.properties.some(p => p.key === param.key && param.nodeName === p.nodeName)) {
-            console.warn(`Parameter with key "${param.key}" already exists.`);
-            continue; // 중복된 키는 무시
-          } else {
-            requestType.properties.push({
-              nodeName: param.nodeName,
-              key: param.nodeName + "_" +param.key,
-              value: param.value,
-              type: param.type,
-              description: param.description || "",
-            } as RequestProperty);            
-          }
-        }
-        setRequestType({
-          properties: requestType.properties.concat(frontParameters),
-        })
-      }
-    }, [nodeId]);
 
     // 키 선택 드롭다운 열기/닫기 처리
     const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
@@ -141,6 +125,15 @@ const ParameterForm = ({
         setOpenKeyPopover(paramId)
         } else {
         setOpenKeyPopover(null)
+        }
+    }, [])
+
+    // 키 선택 드롭다운 열기/닫기 처리
+    const handleValuePopoverOpenChange = useCallback((paramId: string, open: boolean) => {
+        if (open) {
+        setOpenValuePopover(paramId)
+        } else {
+        setOpenValuePopover(null)
         }
     }, [])
 
@@ -272,29 +265,61 @@ const ParameterForm = ({
                         </PopoverContent>
                       </Popover>
                   </div>
-              <div className="p-2">
-                    {/* 값 입력 부분을 단일 입력 필드로 변경 */}
-                    <div className="relative">
-                      {param.valueSource === "linked" ? (
-                        <div className="flex">
-                          <Input
-                            value={param.key}
-                            className="w-full"
-                            disabled={param.valueSource === "linked"}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex">
-                          <Input
-                            placeholder="Value"
-                            value={param.value}
-                            onChange={(e) => handleParameterChange(param.id, "value", e.target.value)}
-                            className="w-full"
-                          />
-                          
-                        </div>
-                      )}
-                    </div>
+                  <div className="p-2">
+                    <Popover
+                        open={openValuePopover === param.id}
+                        onOpenChange={(open) => handleValuePopoverOpenChange(param.id, open)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full justify-between">
+                            <div className="flex items-center">
+                              {param.key || "Select key..."}
+                            </div>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0 border border-black rounded">
+                          <Command>
+                            <CommandInput placeholder="Search key..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                <Input></Input>
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {frontParameters.length > 0 &&
+                                  Object.entries(frontParameters).map(([key, prop]) => (
+                                    <CommandItem
+                                      key={key}
+                                      value={key}
+                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover)}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center">
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              param.key === key ? "opacity-100" : "opacity-0",
+                                            )}
+                                          />
+                                          {prop.key}
+                                          {prop.description && (
+                                            <span className="ml-2 text-xs text-muted-foreground">
+                                              {prop.nodeName ? `(${prop.nodeName}) ` : ""}
+                                              {prop.description}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <Badge variant="outline" className="text-xs">
+                                          {prop.type}
+                                        </Badge>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                   </div>
                   <div className="flex items-center justify-center">
                     <Button
