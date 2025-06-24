@@ -1,0 +1,3 @@
+[submodule "itol-ts"]
+	path = itol-ts
+	url = ./itol-ts
