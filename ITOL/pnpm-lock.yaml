@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  react-json-schema-viewer: link:..\react-json-schema-viewer
+
 importers:
 
   .:
@@ -56,6 +59,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      react-json-schema-viewer:
+        specifier: link:../react-json-schema-viewer
+        version: link:../react-json-schema-viewer
       tailwind-merge:
         specifier: ^3.3.1
         version: 3.3.1
