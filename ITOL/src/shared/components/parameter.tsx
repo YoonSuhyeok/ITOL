@@ -81,12 +81,14 @@ const ParameterForm = ({
     nodeId,
     isParameterSectionCollapsed,
     setIsParameterSectionCollapsed,
-    parent_parameters
+    parent_parameters,
+    isNodeMinimized
 }: {
     nodeId: string;
     isParameterSectionCollapsed: boolean;
     setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
     parent_parameters: RequestProperty[];
+    isNodeMinimized: boolean;
 }) => {
     
     const [parameters, setParameters] = useState<Parameter[]>([]);
@@ -95,7 +97,7 @@ const ParameterForm = ({
     useEffect(() => {
       const frontParameters = DagServiceInstance.getFrontNodeParameters(nodeId);
       setFrontParameters(frontParameters);
-      // setParameters(DagServiceInstance.getNodeParameters(nodeId));
+      setParameters(DagServiceInstance.getNodeParameters(nodeId));
     }, [nodeId]);
 
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
@@ -154,26 +156,30 @@ const ParameterForm = ({
   );
 
   const addParameter = useCallback(() => {
-    setParameters((prev) => [
-      ...prev,
-      {
-        id: `param-${Date.now()}`,
-        enabled: true,
-        key: null,
-        value: null,
-        checked: false,
-        type: "string", // 기본 타입은 string
-        valueSource: "linked", // 기본 값 소스는 linked
-        sourcePath: "",
-        sourceNodeLabel: "",
-        sourceNodeId: ""
-      }
-    ]);
-  }, []);
+    const newParameter: Parameter = {
+      id: `param-${Date.now()}`,
+      enabled: true,
+      key: null,
+      value: null,
+      checked: false,
+      type: "string", // 기본 타입은 string
+      valueSource: "linked", // 기본 값 소스는 linked
+      sourcePath: "",
+      sourceNodeLabel: "",
+      sourceNodeId: ""
+    };
+    
+    setParameters((prev) => {
+      const updatedParams = [...prev, newParameter];
+      // DagService에도 저장 (만약 setNodeParameters 메서드가 있다면)
+      // DagServiceInstance.setNodeParameters?.(nodeId, updatedParams);
+      return updatedParams;
+    });
+  }, [nodeId]);
 
 
     return (
-        <div>
+        <div style={{ display: isNodeMinimized ? 'none' : 'block' }}>
             <div className="flex justify-between items-center mb-4">
               <div
                 className="flex items-center gap-2 cursor-pointer"

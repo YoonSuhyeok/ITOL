@@ -266,14 +266,13 @@ function FileNode({ setNodes, ...node }: FileNodeProps) {
 				</div>
 				</div>
 			)}
-			 {!isNodeMinimized && (
-				<ParameterForm 
-				nodeId={node.id}
-				isParameterSectionCollapsed={isParameterSectionCollapsed}
-				setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
-				parent_parameters={data.requestProperties}>
-				</ParameterForm>
-			 )}
+			<ParameterForm 
+			nodeId={node.id}
+			isParameterSectionCollapsed={isParameterSectionCollapsed}
+			setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
+			parent_parameters={data.requestProperties}
+			isNodeMinimized={isNodeMinimized}>
+			</ParameterForm>
 			{/* 입력 핸들 */}
 			<Handle
 				type="target"
