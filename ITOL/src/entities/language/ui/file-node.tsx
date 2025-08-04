@@ -6,10 +6,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@radix-ui/react-tooltip";
-import { Handle, NodeProps, Position, Node, useEdgesState, MarkerType, 
-  useNodesData,
-  getConnectedEdges
- } from "@xyflow/react";
+import { Handle, NodeProps, Position, Node } from "@xyflow/react";
 import {
 	Check,
 	ChevronDown,
@@ -20,7 +17,7 @@ import {
 	Save,
 	X,
 } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { useState } from "react";
 import type FileNodeData from "../model/file-type";
 import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
