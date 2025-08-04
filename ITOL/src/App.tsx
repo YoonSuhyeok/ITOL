@@ -9,16 +9,15 @@ import type FileNodeData from "@/entities/language/model/file-type";
 import FileNode from "@/entities/language/ui/file-node";
 import { useCallback } from "react";
 
-const nodeTypes = {
-	languageNode: FileNode
-};
-
 export default function App() {
 
 	// const nodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
 	// const edges = DagServiceInstance.getEdgeData();
 	const [nodes, setNodes, onNodesChange] = useNodesState(DagServiceInstance.getNodeData());
-	const useNodeStore = useNodesState(nodes);
+
+	const nodeTypes = {
+		languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} />
+	};
 
 	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
 	const onConnect = useCallback(

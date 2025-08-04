@@ -43,7 +43,21 @@ const handleBuild = async () => {
 	});
 };
 
-function FileNode(node: NodeProps<Node<FileNodeData>>) {
+const handleSave = async () => {
+	// Simulate save logic
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true); // Simulate successful save
+		}, 1000);
+	});
+}
+
+interface FileNodeProps extends NodeProps<Node<FileNodeData>> {
+	setNodes: React.Dispatch<React.SetStateAction<Node<FileNodeData>[]>>;
+}
+
+function FileNode({ setNodes, ...node }: FileNodeProps) {
+	
   const data = node.data as FileNodeData;
   const {
 		isSaving,
@@ -227,7 +241,7 @@ function FileNode(node: NodeProps<Node<FileNodeData>>) {
 						size="icon"
 						className="h-8 w-8"
 						onClick={() => {
-							// setNodes((nodes) => nodes.filter((node) => node.id !== id));
+							setNodes((nds) => nds.filter((n) => n.id !== node.id));
 						}}
 					>
 						<X className="h-4 w-4" />

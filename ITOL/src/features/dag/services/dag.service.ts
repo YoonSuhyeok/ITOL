@@ -1,6 +1,6 @@
 import FileNodeData from "@/entities/language/model/file-type";
 import { useNodeStore } from "@/shared/store/use-node-store";
-import NodeType from "@/shared/types/node-type";
+import Parameter from "@/shared/types/node-parameter-type";
 import { Edge, MarkerType, Node } from "@xyflow/react";
 
 /**
@@ -59,124 +59,10 @@ class DagService {
               },
             ],
           },
-        },
-        {
-          type: "languageNode",
-          id: "2",
-          position: { x: 500, y: 0 },
-          data: {
-            filePath: "1",
-            fileName: "example2",
-            fileExtension: "ts",
-            requestProperties: [
-              {
-                nodeName: undefined,
-                key: "property1",
-                type: "string",
-                value: null,
-                description: "This is a string property",
-              },
-              {
-                nodeName: undefined,
-                key: "property2",
-                type: "number",
-                value: 42,
-                description: "This is a number property", 
-              },
-            ],
-          },
-        },
-        {
-          type: "languageNode",
-          id: "3",
-          position: { x: 500, y: 300 },
-          data: {
-            filePath: "1",
-            fileName: "example2-2",
-            fileExtension: "ts",
-            requestProperties: [
-              {
-                nodeName: undefined,
-                key: "property1",
-                type: "string",
-                value: null,
-                description: "This is a string property",
-              },
-              {
-                nodeName: undefined,
-                key: "property2",
-                type: "number",
-                value: 42,
-                description: "This is a number property", 
-              },
-            ],
-          },
-        },
-        {
-          type: "languageNode",
-          id: "4",
-          position: { x: 1000, y: 0 },
-          data: {
-            filePath: "1",
-            fileName: "example3",
-            fileExtension: "ts",
-            requestProperties: [
-              {
-                nodeName: undefined,
-                key: "property1",
-                type: "string",
-                value: null,
-                description: "This is a string property",
-              },
-              {
-                nodeName: undefined,
-                key: "property2",
-                type: "number",
-                value: 42,
-                description: "This is a number property", 
-              },
-            ],
-          },
         }
     ];
 
     this.graphEdgeData = [
-      {
-        id: "e1-2",
-        source: "1",
-        target: "2",
-        type: "default",
-        animated: true,
-        label: "Edge from 1 to 2",
-        markerEnd: { type: MarkerType.ArrowClosed },
-      },
-      {
-        id: "e1-3",
-        source: "1",
-        target: "3",
-        type: "default",
-        animated: true,
-        label: "Edge from 1 to 3",
-        markerEnd: { type: MarkerType.ArrowClosed },
-      },
-      {
-        id: "e2-4",
-        source: "2",
-        target: "4",
-        type: "default",
-        animated: true,
-        label: "Edge from 2 to 4",
-        markerEnd: { type: MarkerType.ArrowClosed },
-      },
-      {
-        id: "e3-4",
-        source: "3",
-        target: "4",
-        type: "default",
-        animated: true,
-        label: "Edge from 3 to 4",
-        markerEnd: { type: MarkerType.ArrowClosed },
-      },
     ];
 
 
@@ -346,6 +232,23 @@ class DagService {
     console.log("Front Node Parameters:", parameters);
     return parameters;
   }
+
+  public getNodeParameters(nodeId: string): Parameter[] {
+    const node = this.graphNodeData.find(n => n.id === nodeId);
+    if (!node) {
+      console.error(`Node with id ${nodeId} not found.`);
+      return [];
+    }
+    const parameters: Parameter[] = [];
+    node.data.requestProperties.forEach(param => {
+          parameters.push({
+            ...param,
+            nodeName: node.data.fileName,
+          });
+        });
+    return parameters;
+  }
+
 }
 
-export const DagServiceInstance = DagService.getInstance();
+export const DagServiceInstance = DagService.getInstance(); 
