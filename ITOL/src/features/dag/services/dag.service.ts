@@ -240,10 +240,18 @@ class DagService {
       return [];
     }
     const parameters: Parameter[] = [];
-    node.data.requestProperties.forEach(param => {
+    node.data.requestProperties.forEach((param, index) => {
           parameters.push({
-            ...param,
-            nodeName: node.data.fileName,
+            id: `${nodeId}-param-${index}`,
+            enabled: true,
+            key: param.key,
+            value: param.value?.toString() || null,
+            checked: false,
+            type: param.type,
+            valueSource: "linked",
+            sourcePath: "",
+            sourceNodeLabel: "",
+            sourceNodeId: ""
           });
         });
     return parameters;

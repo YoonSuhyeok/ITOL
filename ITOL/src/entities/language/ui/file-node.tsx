@@ -277,12 +277,12 @@ function FileNode({ setNodes, ...node }: FileNodeProps) {
 			<Handle
 				type="target"
 				position={Position.Left}
-				style={{ background: "#555", width: 8, height: 8 }}
+				className="w-2 h-2 bg-gray-600"
 			/>
 			<Handle
 				type="source"
 				position={Position.Right}
-				style={{ background: "#555", width: 8, height: 8 }}
+				className="w-2 h-2 bg-gray-600"
 			/>
 		</div>
 	);

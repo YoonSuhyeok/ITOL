@@ -235,10 +235,10 @@ const ParameterForm = ({
                               </CommandEmpty>
                               <CommandGroup>
                                 {requestType &&
-                                  Object.entries(requestType.properties).map(([key, prop]) => (
+                                  requestType.properties.map((prop, index) => (
                                     <CommandItem
-                                      key={key}
-                                      value={key}
+                                      key={`key-${param.id}-${prop.key}-${prop.nodeName || 'no-node'}-${index}`}
+                                      value={prop.key}
                                       onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover)}
                                     >
                                       <div className="flex items-center justify-between w-full">
@@ -246,7 +246,7 @@ const ParameterForm = ({
                                           <Check
                                             className={cn(
                                               "mr-2 h-4 w-4",
-                                              param.key === key ? "opacity-100" : "opacity-0",
+                                              param.key === prop.key ? "opacity-100" : "opacity-0",
                                             )}
                                           />
                                           {prop.key}
@@ -294,25 +294,25 @@ const ParameterForm = ({
                               </CommandEmpty>
                               <CommandGroup>
                                 {frontParameters.length > 0 &&
-                                  Object.entries(frontParameters).map(([key, prop]) => (
+                                  frontParameters.map((prop, index) => (
                                     <CommandItem
-                                      key={key}
-                                      value={key}
-                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover)}
+                                      key={`value-${param.id}-${prop.key || 'no-key'}-${index}`}
+                                      value={prop.key || ''}
+                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, (prop as any).nodeName, setParameters, setOpenKeyPopover)}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center">
                                           <Check
                                             className={cn(
                                               "mr-2 h-4 w-4",
-                                              param.key === key ? "opacity-100" : "opacity-0",
+                                              param.key === prop.key ? "opacity-100" : "opacity-0",
                                             )}
                                           />
                                           {prop.key}
-                                          {prop.description && (
+                                          {(prop as any).description && (
                                             <span className="ml-2 text-xs text-muted-foreground">
-                                              {prop.nodeName ? `(${prop.nodeName}) ` : ""}
-                                              {prop.description}
+                                              {(prop as any).nodeName ? `(${(prop as any).nodeName}) ` : ""}
+                                              {(prop as any).description}
                                             </span>
                                           )}
                                         </div>
