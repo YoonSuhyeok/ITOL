@@ -89,28 +89,14 @@ const ParameterForm = ({
     parent_parameters: RequestProperty[];
 }) => {
     
-    const [parameters, setParameters] = useState<Parameter[]>([
-      {
-        	id: '1',
-          enabled: false,
-          key: null,
-          value: null,
-          checked: false,
-          type: 'string',
-          valueSource: "dynamic",
-          sourcePath:  '',
-          sourceNodeLabel: '',
-          sourceNodeId: '',
-      }
-    ]);
+    const [parameters, setParameters] = useState<Parameter[]>([]);
     const [frontParameters, setFrontParameters] = useState<Parameter[]>([]);
 
     useEffect(() => {
       const frontParameters = DagServiceInstance.getFrontNodeParameters(nodeId);
       setFrontParameters(frontParameters);
+      // setParameters(DagServiceInstance.getNodeParameters(nodeId));
     }, [nodeId]);
-
-    console.log("PARAMETERS", parameters);
 
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
 
@@ -158,7 +144,7 @@ const ParameterForm = ({
   };
 
   const handleParameterChange = useCallback(
-    (key: string, field: keyof Parameter, value: any) => {
+    (key: string | null, field: keyof Parameter, value: any) => {
       setParameters((prev) =>
         prev.map((param) => (param.key === key ? { ...param, [field]: value } : param))
       );
@@ -166,11 +152,23 @@ const ParameterForm = ({
     },
     []
   );
+
   const addParameter = useCallback(() => {
     setParameters((prev) => [
       ...prev,
-      { id: `param${prev.length + 1}`, key: "", value: "", valueSource: "manual", checked: false, type: "" },
-    ])
+      {
+        id: `param-${Date.now()}`,
+        enabled: true,
+        key: null,
+        value: null,
+        checked: false,
+        type: "string", // 기본 타입은 string
+        valueSource: "linked", // 기본 값 소스는 linked
+        sourcePath: "",
+        sourceNodeLabel: "",
+        sourceNodeId: ""
+      }
+    ]);
   }, []);
 
 
@@ -266,6 +264,9 @@ const ParameterForm = ({
                       </Popover>
                   </div>
                   <div className="p-2">
+                    { frontParameters.length === 0 ? 
+                      <Input disabled={param.key === null}></Input>
+                    : 
                     <Popover
                         open={openValuePopover === param.id}
                         onOpenChange={(open) => handleValuePopoverOpenChange(param.id, open)}
@@ -320,6 +321,7 @@ const ParameterForm = ({
                           </Command>
                         </PopoverContent>
                       </Popover>
+                    }
                   </div>
                   <div className="flex items-center justify-center">
                     <Button
