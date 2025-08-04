@@ -54,7 +54,7 @@ class DagService {
                 nodeName: undefined,
                 key: "property2",
                 type: "number",
-                value: 42,
+                value: null,
                 description: "This is a number property", 
               },
             ],
