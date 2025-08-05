@@ -86,6 +86,22 @@ function handleValueSelect(
     setOpenPopover(null);
 }
 
+function handleValueSourceChange(paramId: string, source: "manual" | "linked", setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>) {
+    // setParameters((prev) =>
+    //   prev.map((param) =>
+    //     param.id === paramId
+    //       ? {
+    //           ...param,
+    //           valueSource: source,
+    //           // 직접 입력 모드로 변경 시 연결 정보 초기화
+    //           ...(source === "manual"
+    //             ? { sourceNodeId: undefined, sourceNodeLabel: undefined, sourcePath: undefined }
+    //             : {}),
+    //         }
+    //       : param,
+    //   ),
+    // )
+}
   // 파라미터 삭제 함수
 function deleteParameter(id: string, parameters: Parameter[], setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>) {
     setParameters((prev) => prev.filter((param) => param.id !== id));
@@ -117,7 +133,7 @@ const ParameterForm = ({
       setFrontParameters(frontParameters);
       setParameters(DagServiceInstance.getNodeParameters(nodeId));
     }, [nodeId]);
-
+                  
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
 
     const [openValuePopover, setOpenValuePopover] = useState<string | null>(null);
