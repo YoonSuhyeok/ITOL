@@ -1,22 +1,28 @@
-import ReactJsonView from '@microlink/react-json-view'
+import JsonSchemaViewer from 'react-json-schema-viewer';
 
-function renderTypeDefinition(requestType: undefined): import("react").ReactNode {
-    return (
-        <ReactJsonView src={{
-        string: 'this is a test string',
-        integer: 42,
-        array: [1, 2, 3, 'test', NaN],
-        float: 3.14159,
-        undefined: undefined,
-        object: {
-            'first-child': true,
-            'second-child': false,
-            'last-child': null
-            },
-        string_number: '1234',
-        date: new Date()
-        }} />
-    );
+const sampleSchema = {
+  "type": "object",
+  "properties": {
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["targets"],
+  "additionalProperties": false
+}
+
+function renderTypeDefinition(type: Record<string, any>): import("react").ReactNode {
+    try {
+        return (
+            <JsonSchemaViewer schema={sampleSchema} />
+        );
+    } catch (error) {
+        console.error('JsonSchemaViewer error:', error);
+        return <div className="text-red-500">Error rendering schema</div>;
+    }
 }
 
 export default renderTypeDefinition;

@@ -1,13 +1,12 @@
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
-import type NodeType from "@/shared/types/node-type";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
 } from "@radix-ui/react-tooltip";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, NodeProps, Position, Node } from "@xyflow/react";
 import {
 	Check,
 	ChevronDown,
@@ -18,22 +17,48 @@ import {
 	Save,
 	X,
 } from "lucide-react";
-import { memo, useState } from "react";
+import { useState } from "react";
 import type FileNodeData from "../model/file-type";
 import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
 import ParameterForm from "@/shared/components/parameter";
+import { DagServiceInstance } from "@/features/dag/services/dag.service";
+import { useNodeStore } from "@/shared/store/use-node-store";
 
-const handleSave = () => {};
+const handleRun = async (nodeId: string) => {
+  DagServiceInstance.initTopologicalSort(); 
+  DagServiceInstance.runNode(nodeId);
+};
 
-const handleRun = () => {};
-const handleBuild = () => {};
+const handleBuild = async () => {
+	// Simulate save logic
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true); // Simulate successful save
+		}, 1000);
+	});
+};
 
-function FileNode({ id, type, data }: NodeType<FileNodeData>) {
-	const {
-		isRunning,
+const handleSave = async () => {
+	// Simulate save logic
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve(true); // Simulate successful save
+		}, 1000);
+	});
+}
+
+interface FileNodeProps extends NodeProps<Node<FileNodeData>> {
+	setNodes: React.Dispatch<React.SetStateAction<Node<FileNodeData>[]>>;
+}
+
+function FileNode({ setNodes, ...node }: FileNodeProps) {
+	
+  const data = node.data as FileNodeData;
+  const {
 		isSaving,
+		setIsSaving,
 		runSuccess,
 		isParameterSectionCollapsed,			
 		setIsParameterSectionCollapsed,
@@ -49,12 +74,16 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 	const [requestType, setRequestType] = useState()
 	const [responseType, setResponseType] = useState()
 
-	return (
+  const { nodeResults } = useNodeStore();
+  const isRunning = nodeResults[node.id]?.status === "running";
+	
+  return (
 		<div
 			className={cn(
 				"bg-background border rounded-md shadow-md w-[500px] relative before:absolute before:inset-[-2px] before:rounded-lg before:bg-black/50 before:blur-[2px] before:-z-10",
-				(isRunning || isSaving) &&
+				(isBuilding || isRunning || isSaving) &&
 					"ring-2 ring-offset-2 ring-offset-background transition-all",
+				isBuilding && "via-amber-400",
 				isRunning && "ring-blue-500",
 				isSaving && "ring-amber-500",
 				runSuccess === true && "ring-green-500",
@@ -67,8 +96,9 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					<div
 						className={cn(
 							"absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer",
+							isBuilding && "via-amber-400",
 							isRunning && "via-blue-400",
-							isSaving && "via-amber-400",
+							isSaving && "via-amber-400"
 						)}
 						style={{ backgroundSize: "200% 100%" }}
 					/>
@@ -142,7 +172,11 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 								"h-8 w-8 relative",
 								isBuilding && "bg-amber-100 text-amber-600",
 							)}
-							onClick={handleBuild}
+							onClick={async () => {
+								setIsBuilding(true);
+								await handleBuild();
+								setIsBuilding(false);
+							}}
 							disabled={isBuilding}
 						>
 							{isBuilding ? (
@@ -161,7 +195,9 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 							runSuccess === true && "bg-green-100 text-green-600",
 							runSuccess === false && "bg-red-100 text-red-600",
 						)}
-						onClick={handleRun}
+						onClick={async () => {
+							await handleRun(node.id);
+						}}
 						disabled={isRunning}
 					>
 						{isRunning ? (
@@ -177,8 +213,16 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 					<Button
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8 relative"
-						onClick={handleSave}
+						className={cn(
+							"h-8 w-8 relative",
+							isSaving && "bg-amber-100 text-amber-600",
+							saveSuccess && "bg-green-100 text-green-600",
+						)}
+						onClick={async () => {
+							setIsSaving(true);
+							await handleSave();
+							setIsSaving(false);
+						}}
 						disabled={isSaving}
 					>
 						{isSaving ? (
@@ -194,7 +238,7 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 						size="icon"
 						className="h-8 w-8"
 						onClick={() => {
-							// setNodes((nodes) => nodes.filter((node) => node.id !== id));
+							setNodes((nds) => nds.filter((n) => n.id !== node.id));
 						}}
 					>
 						<X className="h-4 w-4" />
@@ -222,26 +266,26 @@ function FileNode({ id, type, data }: NodeType<FileNodeData>) {
 				</div>
 				</div>
 			)}
-			 {!isNodeMinimized && (
-				<ParameterForm 
-				isParameterSectionCollapsed={isParameterSectionCollapsed}
-				setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
-				parent_parameters={[]}>
-				</ParameterForm>
-			 )}
+			<ParameterForm 
+        nodeId={node.id}
+        isParameterSectionCollapsed={isParameterSectionCollapsed}
+        setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
+        parent_parameters={data.requestProperties}
+        isNodeMinimized={isNodeMinimized}>
+			</ParameterForm>
 			{/* 입력 핸들 */}
 			<Handle
 				type="target"
 				position={Position.Left}
-				style={{ background: "#555", width: 8, height: 8 }}
+				className="w-2 h-2 bg-gray-600"
 			/>
 			<Handle
-				type="target"
+				type="source"
 				position={Position.Right}
-				style={{ background: "#555", width: 8, height: 8 }}
+				className="w-2 h-2 bg-gray-600"
 			/>
 		</div>
 	);
 }
 
-export default memo(FileNode);
+export default FileNode;

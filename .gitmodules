@@ -1,0 +1,6 @@
+[submodule "itol-ts"]
+	path = itol-ts
+	url = https://github.com/YoonSuhyeok/ITOL-TS
+[submodule "react-json-schema-viewer"]
+	path = react-json-schema-viewer
+	url = https://github.com/YoonSuhyeok/react-json-schema-viewer

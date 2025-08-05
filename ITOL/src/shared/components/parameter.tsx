@@ -1,5 +1,5 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@radix-ui/react-popover";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Check, ChevronDown, ChevronRight, ChevronsUpDown, X } from "lucide-react";
@@ -7,32 +7,83 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Input } from "./ui/input";
 
 import Parameter from "../types/node-parameter-type";
-import ReuqestBody from "../types/request-type";
+import { RequestBody, RequestProperty} from "../types/request-type";
 import { cn } from "../lib/utils";
 import { Checkbox } from "./ui/checkbox";
-
-function getShortNodeId(nodeId: string): string {
-    return nodeId.length > 6 ? nodeId.substring(0, 6) + "..." : nodeId
-}
+import { DagServiceInstance } from "@/features/dag/services/dag.service";
 
 // 키 선택 처리
-function handleKeySelect(paramId: string, key: string, type: string, setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setOpenKeyPopover: React.Dispatch<React.SetStateAction<string | null>>) {
-    // 파라미터 업데이트
+function handleKeySelect(
+  paramId: string, 
+  key: string | null, 
+  type: "string" | "number" | "boolean" | "object" | "array", 
+  nodeName: string | undefined, 
+  setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, 
+  setOpenPopover: React.Dispatch<React.SetStateAction<string | null>>
+) {
+    if (!key) return;
+    
+    if(nodeName === undefined) {
+      setParameters((prev) =>
+        prev.map((param) =>
+          param.id === paramId
+            ? {
+                ...param,
+                key,
+                type,
+                checked: true,
+              }
+            : param,
+        )
+      )
+    } else  {
+      setParameters((prev) =>
+        prev.map((param) =>
+          param.id === paramId
+            ? {
+                ...param,
+                key,
+                type,
+                checked: true,
+                valueSource: "linked" as const
+              }
+            : param,
+        )
+      )
+    }
+
+    // 팝오버 닫기
+    setOpenPopover(null);
+}
+
+// 값 선택 처리
+function handleValueSelect(
+  paramId: string, 
+  value: string | null, 
+  sourceNodeId: string | undefined,
+  sourceNodeLabel: string | undefined,
+  setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, 
+  setOpenPopover: React.Dispatch<React.SetStateAction<string | null>>
+) {
+    if (!value) return;
+    
     setParameters((prev) =>
       prev.map((param) =>
         param.id === paramId
           ? {
               ...param,
-              key,
-              type,
+              value,
+              sourceNodeId: sourceNodeId || "",
+              sourceNodeLabel: sourceNodeLabel || "",
+              valueSource: "linked" as const,
               checked: true,
             }
           : param,
       )
-    )
+    );
 
     // 팝오버 닫기
-    setOpenKeyPopover(null)
+    setOpenPopover(null);
 }
 
 function handleValueSourceChange(paramId: string, source: "manual" | "linked", setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>) {
@@ -51,7 +102,6 @@ function handleValueSourceChange(paramId: string, source: "manual" | "linked", s
     //   ),
     // )
 }
-
   // 파라미터 삭제 함수
 function deleteParameter(id: string, parameters: Parameter[], setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>) {
     setParameters((prev) => prev.filter((param) => param.id !== id));
@@ -62,39 +112,87 @@ function deleteParameter(id: string, parameters: Parameter[], setParameters: Rea
 }
 
 const ParameterForm = ({
+    nodeId,
     isParameterSectionCollapsed,
     setIsParameterSectionCollapsed,
-    parent_parameters
+    parent_parameters,
+    isNodeMinimized
 }: {
+    nodeId: string;
     isParameterSectionCollapsed: boolean;
     setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-    parent_parameters: {
-        id: string;
-        key: string;
-        value: string;
-        type?: string;
-        checked: boolean;
-        valueSource?: "linked" | "static";
-        sourcePath?: string;
-    }[];
+    parent_parameters: RequestProperty[];
+    isNodeMinimized: boolean;
 }) => {
     
-    const [parameters, setParameters] = useState<Parameter[]>([
-      {
-        	id: '1',
-          enabled: false,
-          key: null,
-          value: null,
-          checked: false,
-          type: 'string',
-          valueSource: "dynamic",
-          sourcePath:  '',
-          sourceNodeLabel: '',
-          sourceNodeId: '',
-      }
-    ]);
+    const [parameters, setParameters] = useState<Parameter[]>([]);
+    const [frontParameters, setFrontParameters] = useState<Parameter[]>([]);
+
+    useEffect(() => {
+      const frontParameters = DagServiceInstance.getFrontNodeParameters(nodeId);
+      setFrontParameters(frontParameters);
+      setParameters(DagServiceInstance.getNodeParameters(nodeId));
+    }, [nodeId]);
+                  
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
-    const [requestType, setRequestType] = useState<ReuqestBody>();
+
+    const [openValuePopover, setOpenValuePopover] = useState<string | null>(null);
+    const [requestType] = useState<RequestBody>({
+      properties: parent_parameters
+    });
+
+    // 사용자 정의 파라미터 입력 상태
+    const [customKeyInput, setCustomKeyInput] = useState<{ [paramId: string]: string }>({});
+    const [customValueInput, setCustomValueInput] = useState<{ [paramId: string]: string }>({});
+
+    // 이미 선택된 키들을 필터링하는 함수
+    const getAvailableKeys = useCallback((currentParamId: string) => {
+      const selectedKeys = parameters
+        .filter(p => p.id !== currentParamId && p.key)
+        .map(p => p.key);
+      
+      return requestType.properties.filter(prop => !selectedKeys.includes(prop.key));
+    }, [parameters, requestType.properties]);
+
+    // 이미 선택된 값들을 필터링하는 함수
+    const getAvailableValues = useCallback((currentParamId: string) => {
+      const selectedKeys = parameters
+        .filter(p => p.id !== currentParamId && p.key)
+        .map(p => p.key);
+      
+      return frontParameters.filter(prop => !selectedKeys.includes(prop.key));
+    }, [parameters, frontParameters]);
+
+    // 사용자 정의 키 추가 처리
+    const handleCustomKeyAdd = useCallback((paramId: string, customKey: string) => {
+      if (customKey.trim()) {
+        handleKeySelect(paramId, customKey.trim(), "string", undefined, setParameters, setOpenKeyPopover);
+        setCustomKeyInput(prev => ({ ...prev, [paramId]: '' }));
+      }
+    }, []);
+
+    // 사용자 정의 값 추가 처리
+    const handleCustomValueAdd = useCallback((paramId: string, customValue: string) => {
+      if (customValue.trim()) {
+        const currentParam = parameters.find(p => p.id === paramId);
+        if (currentParam) {
+          setParameters(prev =>
+            prev.map(param =>
+              param.id === paramId
+                ? {
+                    ...param,
+                    value: customValue.trim(),
+                    valueSource: "dynamic" as const,
+                    checked: true
+                  }
+                : param
+            )
+          );
+        }
+        setCustomValueInput(prev => ({ ...prev, [paramId]: '' }));
+        setOpenValuePopover(null);
+      }
+    }, [parameters]);
 
     // 키 선택 드롭다운 열기/닫기 처리
     const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
@@ -105,42 +203,50 @@ const ParameterForm = ({
         }
     }, [])
 
-  const paramTypes = ["string", "number"] as const;
-
-  // 각 파라미터별 type 팝오버 열기 상태 (param.id 또는 null)
-  const [openTypePopover, setOpenTypePopover] = useState<string | null>(null);
-
-  // type 선택 핸들러
-  const handleTypeSelect = (paramId: string, type: string) => {
-    setParameters((prev) =>
-      prev.map((p) =>
-        p.id === paramId
-          ? {
-              ...p,
-              type,
-            }
-          : p
-      )
-    );
-    setOpenTypePopover(null);
-  };
+    // 키 선택 드롭다운 열기/닫기 처리
+    const handleValuePopoverOpenChange = useCallback((paramId: string, open: boolean) => {
+        if (open) {
+        setOpenValuePopover(paramId)
+        } else {
+        setOpenValuePopover(null)
+        }
+    }, [])
 
   const handleParameterChange = useCallback(
-    (id: string, field: keyof Parameter, value: any) => {
+    (key: string | null, field: keyof Parameter, value: any) => {
       setParameters((prev) =>
-        prev.map((param) => (param.id === id ? { ...param, [field]: value } : param))
+        prev.map((param) => (param.key === key ? { ...param, [field]: value } : param))
       );
+      console.log(`Parameter ${field} changed for ${key}:`, value);
     },
     []
   );
+
   const addParameter = useCallback(() => {
-    setParameters((prev) => [
-      ...prev,
-      { id: `param${prev.length + 1}`, key: "", value: "", valueSource: "manual", checked: false, type: "" },
-    ])
-  }, [])
+    const newParameter: Parameter = {
+      id: `param-${Date.now()}`,
+      enabled: true,
+      key: null,
+      value: null,
+      checked: false,
+      type: "string", // 기본 타입은 string
+      valueSource: "linked", // 기본 값 소스는 linked
+      sourcePath: "",
+      sourceNodeLabel: "",
+      sourceNodeId: ""
+    };
+    
+    setParameters((prev) => {
+      const updatedParams = [...prev, newParameter];
+      // DagService에도 저장 (만약 setNodeParameters 메서드가 있다면)
+      // DagServiceInstance.setNodeParameters?.(nodeId, updatedParams);
+      return updatedParams;
+    });
+  }, [nodeId]);
+
+
     return (
-        <div>
+        <div style={{ display: isNodeMinimized ? 'none' : 'block' }}>
             <div className="flex justify-between items-center mb-4">
               <div
                 className="flex items-center gap-2 cursor-pointer"
@@ -171,7 +277,7 @@ const ParameterForm = ({
                   <div className="flex items-center justify-center">
                     <Checkbox
                       checked={param.checked}
-                      onCheckedChange={(checked) => handleParameterChange(param.id, "checked", checked)}
+                      onCheckedChange={(checked) => handleParameterChange(param.key, "checked", checked)}
                     />
                   </div>
                   <div className="p-2">
@@ -187,7 +293,7 @@ const ParameterForm = ({
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0">
+                        <PopoverContent className="w-[300px] p-0 border border-black rounded">
                           <Command>
                             <CommandInput placeholder="Search key..." />
                             <CommandList>
@@ -195,24 +301,24 @@ const ParameterForm = ({
                                 <Input></Input>
                               </CommandEmpty>
                               <CommandGroup>
-                                {requestType &&
-                                  Object.entries(requestType.properties).map(([key, prop]) => (
+                                {getAvailableKeys(param.id).map((prop, index) => (
                                     <CommandItem
-                                      key={key}
-                                      value={key}
-                                      onSelect={() => handleKeySelect(param.id, key, prop.type, setParameters, setOpenKeyPopover)}
+                                      key={`key-${param.id}-${prop.key}-${prop.nodeName || 'no-node'}-${index}`}
+                                      value={prop.key}
+                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover)}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center">
                                           <Check
                                             className={cn(
                                               "mr-2 h-4 w-4",
-                                              param.key === key ? "opacity-100" : "opacity-0",
+                                              param.key === prop.key ? "opacity-100" : "opacity-0",
                                             )}
                                           />
-                                          {key}
+                                          {prop.key}
                                           {prop.description && (
                                             <span className="ml-2 text-xs text-muted-foreground">
+                                              {prop.nodeName ? `(${prop.nodeName}) ` : ""}
                                               {prop.description}
                                             </span>
                                           )}
@@ -222,50 +328,134 @@ const ParameterForm = ({
                                         </Badge>
                                       </div>
                                     </CommandItem>
-                                  ))}
+                                ))}
+                                {getAvailableKeys(param.id).length === 0 && (
+                                  <CommandItem disabled>
+                                    <span className="text-gray-500">모든 파라미터가 이미 선택됨</span>
+                                  </CommandItem>
+                                )}
                               </CommandGroup>
+                              <div className="p-2 border-t">
+                                <Input
+                                  placeholder="새 파라미터 이름 입력..."
+                                  value={customKeyInput[param.id] || ''}
+                                  onChange={(e) => setCustomKeyInput(prev => ({ ...prev, [param.id]: e.target.value }))}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleCustomKeyAdd(param.id, customKeyInput[param.id] || '');
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  className="mt-1 w-full"
+                                  onClick={() => handleCustomKeyAdd(param.id, customKeyInput[param.id] || '')}
+                                  disabled={!customKeyInput[param.id]?.trim()}
+                                >
+                                  추가
+                                </Button>
+                              </div>
                             </CommandList>
                           </Command>
                         </PopoverContent>
                       </Popover>
                   </div>
-              <div className="p-2">
-                    {/* 값 입력 부분을 단일 입력 필드로 변경 */}
-                    <div className="relative">
-                      {param.valueSource === "linked" && param.sourcePath ? (
-                        <div className="flex items-center">
-                          <Input
-                            value={param.value}
-                            onChange={(e) => handleParameterChange(param.id, "value", e.target.value)}
-                            className="w-full pr-24"
-                            readOnly={param.valueSource === "linked"}
-                          />
-                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
-                              {param.sourceNodeLabel || getShortNodeId(param.sourceNodeId || "")}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleValueSourceChange(param.id, "manual", setParameters)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex">
-                          <Input
-                            placeholder="Value"
-                            value={param.value}
-                            onChange={(e) => handleParameterChange(param.id, "value", e.target.value)}
-                            className="w-full"
-                          />
-                          
-                        </div>
-                      )}
-                    </div>
+                  <div className="p-2">
+                    { getAvailableValues(param.id).length === 0 ? 
+                      <Input 
+                        placeholder="직접 값 입력..."
+                        disabled={param.key === null}
+                        value={param.value || ''}
+                        onChange={(e) => {
+                          setParameters(prev =>
+                            prev.map(p =>
+                              p.id === param.id
+                                ? { ...p, value: e.target.value, valueSource: "dynamic" as const }
+                                : p
+                            )
+                          );
+                        }}
+                      />
+                    : 
+                    <Popover
+                        open={openValuePopover === param.id}
+                        onOpenChange={(open) => handleValuePopoverOpenChange(param.id, open)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full justify-between">
+                            <div className="flex items-center">
+                              {param.value || "Select value..."}
+                            </div>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0 border border-black rounded">
+                          <Command>
+                            <CommandInput placeholder="Search key..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                <Input></Input>
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {getAvailableValues(param.id).map((prop, index) => (
+                                    <CommandItem
+                                      key={`value-${param.id}-${prop.key || 'no-key'}-${index}`}
+                                      value={prop.key || ''}
+                                      onSelect={() => handleValueSelect(param.id, prop.key, (prop as any).sourceNodeId, (prop as any).nodeName, setParameters, setOpenValuePopover)}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center">
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              param.value === prop.key ? "opacity-100" : "opacity-0",
+                                            )}
+                                          />
+                                          {prop.key}
+                                          {(prop as any).description && (
+                                            <span className="ml-2 text-xs text-muted-foreground">
+                                              {(prop as any).nodeName ? `(${(prop as any).nodeName}) ` : ""}
+                                              {(prop as any).description}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <Badge variant="outline" className="text-xs">
+                                          {prop.type}
+                                        </Badge>
+                                      </div>
+                                    </CommandItem>
+                                ))}
+                                {getAvailableValues(param.id).length === 0 && (
+                                  <CommandItem disabled>
+                                    <span className="text-gray-500">모든 값이 이미 선택됨</span>
+                                  </CommandItem>
+                                )}
+                              </CommandGroup>
+                              <div className="p-2 border-t">
+                                <Input
+                                  placeholder="사용자 정의 값 입력..."
+                                  value={customValueInput[param.id] || ''}
+                                  onChange={(e) => setCustomValueInput(prev => ({ ...prev, [param.id]: e.target.value }))}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleCustomValueAdd(param.id, customValueInput[param.id] || '');
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  className="mt-1 w-full"
+                                  onClick={() => handleCustomValueAdd(param.id, customValueInput[param.id] || '')}
+                                  disabled={!customValueInput[param.id]?.trim()}
+                                >
+                                  추가
+                                </Button>
+                              </div>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    }
                   </div>
                   <div className="flex items-center justify-center">
                     <Button
