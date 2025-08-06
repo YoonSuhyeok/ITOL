@@ -7,6 +7,7 @@ import { DagServiceInstance } from "./features/dag/services/dag.service";
 import FileNode from "@/entities/language/ui/file-node";
 import { useCallback, useMemo } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
+import WindowHeader from "./shared/components/window-header";
 
 export default function App() {
 	return (
@@ -100,18 +101,21 @@ function FlowCanvas() {
 	);
 
 	return (
-		<div style={{ width: "100vw", height: "100vh" }}>
-			<ReactFlow
-				nodeTypes={nodeTypes}
-				nodes={nodes}
-				edges={edges}
-				onNodesChange={onNodesChange}
-				onEdgesChange={onEdgesChange}
-				onConnect={onConnect}
-				onConnectEnd={onConnectEnd}
-			>
-				<Background />
-			</ReactFlow>
-		</div>
+		<>
+			<WindowHeader />
+			<div style={{ width: "100vw", height: "100vh" }}>
+				<ReactFlow
+					nodeTypes={nodeTypes}
+					nodes={nodes}
+					edges={edges}
+					onNodesChange={onNodesChange}
+					onEdgesChange={onEdgesChange}
+					onConnect={onConnect}
+					onConnectEnd={onConnectEnd}
+				>
+					<Background />
+				</ReactFlow>
+			</div>
+		</>
 	);
 }

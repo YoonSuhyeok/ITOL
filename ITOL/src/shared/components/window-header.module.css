@@ -1,0 +1,195 @@
+/* VS Code 스타일 윈도우 헤더 */
+.windowHeader {
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #2d2d30;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 타이틀바 */
+.titleBar {
+  height: 30px;
+  background-color: #2d2d30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+/* 메뉴 섹션 */
+.menuSection {
+  display: flex;
+  align-items: center;
+}
+
+.menuItems {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.menuItem {
+  background: none;
+  border: none;
+  color: #cccccc;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  border-radius: 2px;
+}
+
+.menuItem:hover {
+  background-color: #3c3c3c;
+}
+
+/* 타이틀 섹션 */
+.titleSection {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.title {
+  color: #cccccc;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 윈도우 컨트롤 */
+.windowControls {
+  display: flex;
+  align-items: center;
+}
+
+.windowButton {
+  width: 46px;
+  height: 30px;
+  background: none;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.1s ease;
+}
+
+.windowButton:hover {
+  background-color: #3c3c3c;
+}
+
+.closeButton:hover {
+  background-color: #e81123 !important;
+  color: white;
+}
+
+/* 탭바 */
+.tabBar {
+  height: 35px;
+  background-color: #252526;
+  border-bottom: 1px solid #2d2d30;
+  display: flex;
+  align-items: center;
+}
+
+.tabs {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  height: 35px;
+  padding: 0 12px;
+  background-color: #2d2d30;
+  border-right: 1px solid #1e1e1e;
+  cursor: pointer;
+  min-width: 120px;
+  max-width: 240px;
+  position: relative;
+}
+
+.tab:hover:not(.activeTab) {
+  background-color: #3c3c3c;
+}
+
+.activeTab {
+  background-color: #1e1e1e;
+  border-bottom: 2px solid #007acc;
+}
+
+.tabLabel {
+  color: #cccccc;
+  font-size: 13px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabCloseBtn {
+  background: none;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 8px;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.tab:hover .tabCloseBtn,
+.activeTab .tabCloseBtn {
+  opacity: 1;
+}
+
+.tabCloseBtn:hover {
+  background-color: #3c3c3c;
+}
+
+.tabActions {
+  padding: 0 8px;
+}
+
+.newTabBtn {
+  background: none;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  border-radius: 2px;
+  transition: background-color 0.1s ease;
+}
+
+.newTabBtn:hover {
+  background-color: #3c3c3c;
+}
+
+/* 스크롤바 스타일 */
+.tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 2px;
+}
+
+.tabs::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+}
