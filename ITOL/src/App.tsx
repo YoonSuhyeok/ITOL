@@ -8,6 +8,7 @@ import FileNode from "@/entities/language/ui/file-node";
 import { useCallback, useMemo } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
 import WindowHeader from "./shared/components/window-header";
+import Toolbar from "./shared/components/toolbar";
 
 export default function App() {
 	return (
@@ -105,7 +106,7 @@ function FlowCanvas() {
 			<WindowHeader />
 			<div style={{ 
 				width: "100%", 
-				height: "calc(100vh - 65px)", /* 헤더 높이(30px + 35px)만큼 빼기 */
+				height: "calc(100vh - 113px)", /* 헤더 높이(65px) + 툴바 높이(48px)만큼 빼기 */
 				marginTop: "65px",
 				overflow: "hidden" 
 			}}>
@@ -121,6 +122,7 @@ function FlowCanvas() {
 					<Background />
 				</ReactFlow>
 			</div>
+			<Toolbar />
 		</div>
 	);
 }
