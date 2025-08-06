@@ -19,9 +19,52 @@ function handleKeySelect(
   type: "string" | "number" | "boolean" | "object" | "array", 
   nodeName: string | undefined, 
   setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, 
-  setOpenPopover: React.Dispatch<React.SetStateAction<string | null>>
+  setOpenPopover: React.Dispatch<React.SetStateAction<string | null>>,
+  currentKey?: string | null
 ) {
-    if (!key) return;
+    // key가 null이면 선택 해제
+    if (key === null) {
+      setParameters((prev) =>
+        prev.map((param) =>
+          param.id === paramId
+            ? {
+                ...param,
+                key: null,
+                value: null,
+                type: "string",
+                checked: false,
+                valueSource: "linked" as const,
+                sourceNodeId: "",
+                sourceNodeLabel: "",
+              }
+            : param,
+        )
+      );
+      setOpenPopover(null);
+      return;
+    }
+
+    // 현재 선택된 키와 같은 키를 다시 클릭하면 해제
+    if (currentKey && currentKey === key) {
+      setParameters((prev) =>
+        prev.map((param) =>
+          param.id === paramId
+            ? {
+                ...param,
+                key: null,
+                value: null,
+                type: "string",
+                checked: false,
+                valueSource: "linked" as const,
+                sourceNodeId: "",
+                sourceNodeLabel: "",
+              }
+            : param,
+        )
+      );
+      setOpenPopover(null);
+      return;
+    }
     
     if(nodeName === undefined) {
       setParameters((prev) =>
@@ -166,10 +209,11 @@ const ParameterForm = ({
     // 사용자 정의 키 추가 처리
     const handleCustomKeyAdd = useCallback((paramId: string, customKey: string) => {
       if (customKey.trim()) {
-        handleKeySelect(paramId, customKey.trim(), "string", undefined, setParameters, setOpenKeyPopover);
+        const currentParam = parameters.find(p => p.id === paramId);
+        handleKeySelect(paramId, customKey.trim(), "string", undefined, setParameters, setOpenKeyPopover, currentParam?.key);
         setCustomKeyInput(prev => ({ ...prev, [paramId]: '' }));
       }
-    }, []);
+    }, [parameters]);
 
     // 사용자 정의 값 추가 처리
     const handleCustomValueAdd = useCallback((paramId: string, customValue: string) => {
@@ -305,7 +349,7 @@ const ParameterForm = ({
                                     <CommandItem
                                       key={`key-${param.id}-${prop.key}-${prop.nodeName || 'no-node'}-${index}`}
                                       value={prop.key}
-                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover)}
+                                      onSelect={() => handleKeySelect(param.id, prop.key, prop.type, prop.nodeName, setParameters, setOpenKeyPopover, param.key)}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center">
