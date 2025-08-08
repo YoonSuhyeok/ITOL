@@ -3,7 +3,11 @@ import { Button } from "./ui/button";
 import { useState } from "react";
 import SettingsModal from "./settings-modal";
 
-const Toolbar = () => {
+interface ToolbarProps {
+  onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
+}
+
+const Toolbar = ({ onCreateFileNode }: ToolbarProps) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleSettingsClick = () => {
@@ -33,6 +37,7 @@ const Toolbar = () => {
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={handleCloseSettings}
+        onCreateFileNode={onCreateFileNode}
       />
     </>
   );

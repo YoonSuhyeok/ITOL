@@ -2,15 +2,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import { useState, useCallback, useEffect } from "react";
-import { Settings, Palette, Keyboard, Info, ChevronRight, FolderOpen, Plus, Edit2, Trash2, PlusSquare, Database, Globe, FileText, File, Folder, ChevronDown, ChevronRight as ChevronRightIcon } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Settings, Palette, Keyboard, Info, ChevronRight, FolderOpen, Plus, Edit2, Trash2, X, PlusSquare, Database, Globe, FileText, File } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { open } from '@tauri-apps/plugin-dialog';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
 }
 
 interface Project {
@@ -45,25 +44,12 @@ const PROJECT_TYPES: { value: ProjectType; label: string; color: string }[] = [
 ];
 
 type MenuSection = 'projects' | 'node-creation' | 'general' | 'appearance' | 'editor' | 'shortcuts' | 'about';
+
 type NodeType = 'file' | 'api' | 'db';
+
 type FileCreationMode = 'create-new' | 'select-existing';
 
-interface FileSystemItem {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  children?: FileSystemItem[];
-  isExpanded?: boolean;
-}
-
-interface ConfirmDialogState {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  onConfirm: () => void;
-}
-
-const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps) => {
+const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [activeSection, setActiveSection] = useState<MenuSection>('projects');
   const [activeNodeTab, setActiveNodeTab] = useState<NodeType>('file');
   const [fileCreationMode, setFileCreationMode] = useState<FileCreationMode>('select-existing');
@@ -93,19 +79,6 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
   const [selectedFilePath, setSelectedFilePath] = useState("");
   const [selectedFolderPath, setSelectedFolderPath] = useState("");
   const [newFileName, setNewFileName] = useState("");
-
-  // 파일 시스템 탐색 상태
-  const [fileSystemItems, setFileSystemItems] = useState<FileSystemItem[]>([]);
-  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
-  const [selectedFileForNode, setSelectedFileForNode] = useState<string>("");
-  
-  // 확인 다이얼로그 상태
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
-    isOpen: false,
-    title: "",
-    message: "",
-    onConfirm: () => {}
-  });
 
   // API 노드 생성 상태
   const [apiData, setApiData] = useState({
@@ -204,7 +177,7 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
     }
   }, []);
 
-  // 노드 생성용 파일 선택 기능 (프로젝트 하위 경로만)
+  // 노드 생성용 파일 선택 기능
   const handleFileSelectForNode = useCallback(async () => {
     if (!selectedProjectId) {
       alert('먼저 프로젝트를 선택해주세요.');
@@ -227,10 +200,7 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
       
       if (selected && typeof selected === 'string') {
         // 선택된 파일이 프로젝트 경로 하위에 있는지 확인
-        const normalizedSelected = selected.replace(/\\/g, '/');
-        const normalizedProjectPath = selectedProject.path.replace(/\\/g, '/');
-        
-        if (normalizedSelected.startsWith(normalizedProjectPath)) {
+        if (selected.startsWith(selectedProject.path)) {
           setSelectedFilePath(selected);
         } else {
           alert('선택된 프로젝트의 하위 경로에서만 파일을 선택할 수 있습니다.');
@@ -241,7 +211,7 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
     }
   }, [selectedProjectId, projects]);
 
-  // 노드 생성용 폴더 선택 기능 (프로젝트 하위 경로만)
+  // 노드 생성용 폴더 선택 기능
   const handleFolderSelectForNode = useCallback(async () => {
     if (!selectedProjectId) {
       alert('먼저 프로젝트를 선택해주세요.');
@@ -264,10 +234,7 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
       
       if (selected && typeof selected === 'string') {
         // 선택된 폴더가 프로젝트 경로 하위에 있는지 확인
-        const normalizedSelected = selected.replace(/\\/g, '/');
-        const normalizedProjectPath = selectedProject.path.replace(/\\/g, '/');
-        
-        if (normalizedSelected.startsWith(normalizedProjectPath)) {
+        if (selected.startsWith(selectedProject.path)) {
           setSelectedFolderPath(selected);
         } else {
           alert('선택된 프로젝트의 하위 경로에서만 폴더를 선택할 수 있습니다.');
@@ -278,162 +245,47 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
     }
   }, [selectedProjectId, projects]);
 
-  // 노드 생성 관련 상태 초기화 함수
-  const resetNodeCreationStates = useCallback(() => {
-    setSelectedFilePath("");
-    setSelectedFolderPath("");
-    setNewFileName("");
-    setSelectedFileForNode("");
-  }, []);
-
-  // 프로젝트 선택 변경 핸들러
-  const handleProjectChange = useCallback((projectId: string) => {
-    setSelectedProjectId(projectId);
-    resetNodeCreationStates();
-    if (projectId) {
-      loadProjectFiles(projectId);
-    } else {
-      setFileSystemItems([]);
-    }
-  }, [resetNodeCreationStates]);
-
-  // 프로젝트 파일 시스템 로드 (Mock 구현)
-  const loadProjectFiles = useCallback(async (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    if (!project) return;
-
-    setIsLoadingFiles(true);
-    try {
-      // Mock 파일 구조 생성 - 실제로는 Tauri fs API 사용
-      const mockStructure: FileSystemItem[] = [
-        {
-          name: "src",
-          path: `${project.path}/src`,
-          isDirectory: true,
-          isExpanded: false,
-          children: [
-            {
-              name: "components",
-              path: `${project.path}/src/components`,
-              isDirectory: true,
-              isExpanded: false,
-              children: [
-                { name: "Button.tsx", path: `${project.path}/src/components/Button.tsx`, isDirectory: false },
-                { name: "Modal.tsx", path: `${project.path}/src/components/Modal.tsx`, isDirectory: false },
-              ]
-            },
-            { name: "App.tsx", path: `${project.path}/src/App.tsx`, isDirectory: false },
-            { name: "main.tsx", path: `${project.path}/src/main.tsx`, isDirectory: false },
-          ]
-        },
-        {
-          name: "public",
-          path: `${project.path}/public`,
-          isDirectory: true,
-          isExpanded: false,
-          children: [
-            { name: "index.html", path: `${project.path}/public/index.html`, isDirectory: false },
-            { name: "favicon.ico", path: `${project.path}/public/favicon.ico`, isDirectory: false },
-          ]
-        },
-        { name: "package.json", path: `${project.path}/package.json`, isDirectory: false },
-        { name: "README.md", path: `${project.path}/README.md`, isDirectory: false },
-      ];
-      
-      setFileSystemItems(mockStructure);
-    } catch (error) {
-      console.error('파일 시스템 로드 실패:', error);
-    } finally {
-      setIsLoadingFiles(false);
-    }
-  }, [projects]);
-
-  // 폴더 토글 함수
-  const toggleFolder = useCallback((path: string) => {
-    const updateItems = (items: FileSystemItem[]): FileSystemItem[] => {
-      return items.map(item => {
-        if (item.path === path && item.isDirectory) {
-          return { ...item, isExpanded: !item.isExpanded };
-        }
-        if (item.children) {
-          return { ...item, children: updateItems(item.children) };
-        }
-        return item;
-      });
-    };
-    
-    setFileSystemItems(updateItems(fileSystemItems));
-  }, [fileSystemItems]);
-
-  // 확인 다이얼로그 닫기
-  const closeConfirmDialog = useCallback(() => {
-    setConfirmDialog({
-      isOpen: false,
-      title: "",
-      message: "",
-      onConfirm: () => {}
-    });
-  }, []);
-
   const handleCancelEdit = useCallback(() => {
     setIsAddingNew(false);
     setEditingProject(null);
     setFormData({ name: "", type: "typescript", path: "", description: "" });
   }, []);
 
+  // 노드 생성 관련 상태 초기화 함수
+  const resetNodeCreationStates = useCallback(() => {
+    setSelectedFilePath("");
+    setSelectedFolderPath("");
+    setNewFileName("");
+  }, []);
+
+  // 프로젝트 선택 변경 핸들러
+  const handleProjectChange = useCallback((projectId: string) => {
+    setSelectedProjectId(projectId);
+    resetNodeCreationStates();
+  }, [resetNodeCreationStates]);
+
   // 노드 생성 함수들
   const handleCreateFileNode = useCallback(() => {
-    if (fileCreationMode === 'select-existing' && selectedProjectId && selectedFileForNode) {
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const fileName = selectedFileForNode.split('/').pop() || selectedFileForNode.split('\\').pop() || '';
-      const fileExtension = fileName.split('.').pop() || 'txt';
-      
-      setConfirmDialog({
-        isOpen: true,
-        title: "FILE 노드 생성",
-        message: `"${fileName}" 파일로 노드를 생성하시겠습니까?\n생성 후 설정 창을 닫습니다.`,
-        onConfirm: () => {
-          console.log('기존 파일 노드 생성:', { 
-            projectId: selectedProjectId, 
-            projectName: selectedProject?.name,
-            filePath: selectedFileForNode 
-          });
-          
-          // 실제 노드 생성
-          const nodeId = onCreateFileNode(selectedFileForNode, fileName, fileExtension);
-          console.log(`FILE 노드가 생성되었습니다! Node ID: ${nodeId}`);
-          
-          closeConfirmDialog();
-          onClose(); // 설정 창 닫기
-        }
-      });
+    if (fileCreationMode === 'select-existing' && selectedProjectId && selectedFilePath) {
+      console.log('기존 파일 노드 생성:', { projectId: selectedProjectId, filePath: selectedFilePath });
+      // 여기에 실제 노드 생성 로직 구현
+      alert('FILE 노드가 생성되었습니다!');
     } else if (fileCreationMode === 'create-new' && selectedProjectId && selectedFolderPath && newFileName) {
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const fullPath = `${selectedFolderPath}/${newFileName}`;
-      const fileExtension = newFileName.split('.').pop() || 'txt';
-      
-      setConfirmDialog({
-        isOpen: true,
-        title: "새 파일 및 노드 생성",
-        message: `"${newFileName}" 파일을 생성하고 노드를 만드시겠습니까?\n생성 후 설정 창을 닫습니다.`,
-        onConfirm: () => {
-          console.log('새 파일 노드 생성:', { 
-            projectId: selectedProjectId, 
-            projectName: selectedProject?.name,
-            folderPath: selectedFolderPath, 
-            fileName: newFileName 
-          });
-          
-          // 실제 노드 생성
-          const nodeId = onCreateFileNode(fullPath, newFileName, fileExtension);
-          console.log(`새 파일 FILE 노드가 생성되었습니다! Node ID: ${nodeId}`);
-          
-          closeConfirmDialog();
-          onClose(); // 설정 창 닫기
-        }
-      });
+      console.log('새 파일 노드 생성:', { projectId: selectedProjectId, folderPath: selectedFolderPath, fileName: newFileName });
+      // 여기에 실제 파일 생성 및 노드 생성 로직 구현
+      alert('새 파일이 생성되고 FILE 노드가 생성되었습니다!');
     }
-  }, [fileCreationMode, selectedProjectId, selectedFileForNode, selectedFolderPath, newFileName, projects, closeConfirmDialog, onClose, onCreateFileNode]);
+  }, [fileCreationMode, selectedProjectId, selectedFilePath, selectedFolderPath, newFileName]);
+    if (fileCreationMode === 'select-existing' && selectedProjectId && selectedFilePath) {
+      console.log('기존 파일 노드 생성:', { projectId: selectedProjectId, filePath: selectedFilePath });
+      // 여기에 실제 노드 생성 로직 구현
+      alert('FILE 노드가 생성되었습니다!');
+    } else if (fileCreationMode === 'create-new' && selectedProjectId && selectedFolderPath && newFileName) {
+      console.log('새 파일 노드 생성:', { projectId: selectedProjectId, folderPath: selectedFolderPath, fileName: newFileName });
+      // 여기에 실제 파일 생성 및 노드 생성 로직 구현
+      alert('새 파일이 생성되고 FILE 노드가 생성되었습니다!');
+    }
+  }, [fileCreationMode, selectedProjectId, selectedFilePath, selectedFolderPath, newFileName]);
 
   const handleCreateApiNode = useCallback(() => {
     if (apiData.url && apiData.description) {
@@ -450,49 +302,6 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
       alert('DB 노드가 생성되었습니다!');
     }
   }, [dbData]);
-
-  // 파일 트리 렌더링 컴포넌트
-  const renderFileTree = useCallback((items: FileSystemItem[], depth = 0) => {
-    return items.map((item) => (
-      <div key={item.path} style={{ marginLeft: `${depth * 20}px` }}>
-        <div
-          className={cn(
-            "flex items-center py-1 px-2 hover:bg-gray-100 cursor-pointer rounded",
-            selectedFileForNode === item.path && !item.isDirectory && "bg-blue-100"
-          )}
-          onClick={() => {
-            if (item.isDirectory) {
-              toggleFolder(item.path);
-            } else {
-              setSelectedFileForNode(item.path);
-            }
-          }}
-        >
-          {item.isDirectory ? (
-            <>
-              {item.isExpanded ? (
-                <ChevronDown className="h-4 w-4 mr-1" />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4 mr-1" />
-              )}
-              <Folder className="h-4 w-4 mr-2 text-blue-600" />
-            </>
-          ) : (
-            <>
-              <div className="w-5" />
-              <FileText className="h-4 w-4 mr-2 text-gray-600" />
-            </>
-          )}
-          <span className="text-sm">{item.name}</span>
-        </div>
-        {item.isDirectory && item.isExpanded && item.children && (
-          <div>
-            {renderFileTree(item.children, depth + 1)}
-          </div>
-        )}
-      </div>
-    ));
-  }, [selectedFileForNode, toggleFolder]);
 
   const menuItems = [
     { id: 'projects' as MenuSection, icon: Settings, label: '프로젝트' },
@@ -619,7 +428,7 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                 </button>
               </div>
 
-              {/* FILE 탭 콘텐츠 */}
+              {/* 탭 콘텐츠 */}
               {activeNodeTab === 'file' && (
                 <div className="space-y-6">
                   <div>
@@ -664,28 +473,17 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                         </button>
                       </div>
 
-                      {/* 기존 파일 선택 UI */}
+                      {/* 선택된 방법에 따른 UI */}
                       {fileCreationMode === 'select-existing' && (
                         <div className="border rounded-lg p-4 bg-gray-50">
                           <h5 className="font-medium mb-3">기존 파일 선택</h5>
                           <div className="space-y-3">
                             <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-sm font-medium">프로젝트 선택</label>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setActiveSection('projects')}
-                                  className="text-xs h-7"
-                                >
-                                  <Settings className="h-3 w-3 mr-1" />
-                                  프로젝트 관리
-                                </Button>
-                              </div>
+                              <label className="text-sm font-medium mb-2 block">프로젝트 선택</label>
                               <select 
                                 className="w-full p-2 border rounded-md"
                                 value={selectedProjectId}
-                                onChange={(e) => handleProjectChange(e.target.value)}
+                                onChange={(e) => setSelectedProjectId(e.target.value)}
                               >
                                 <option value="">프로젝트를 선택하세요</option>
                                 {projects.map((project) => (
@@ -694,52 +492,31 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                                   </option>
                                 ))}
                               </select>
-                              {projects.length === 0 && (
-                                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md text-center">
-                                  <p className="text-sm text-gray-600 mb-2">등록된 프로젝트가 없습니다.</p>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setActiveSection('projects')}
-                                    className="text-xs"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    프로젝트 추가하기
-                                  </Button>
-                                </div>
-                              )}
                             </div>
-                            
-                            {selectedProjectId && (
-                              <div>
-                                <label className="text-sm font-medium mb-2 block">파일 탐색</label>
-                                <div className="border rounded-md bg-white max-h-64 overflow-y-auto">
-                                  {isLoadingFiles ? (
-                                    <div className="p-4 text-center text-sm text-gray-500">
-                                      파일을 불러오는 중...
-                                    </div>
-                                  ) : fileSystemItems.length > 0 ? (
-                                    <div className="p-2">
-                                      {renderFileTree(fileSystemItems)}
-                                    </div>
-                                  ) : (
-                                    <div className="p-4 text-center text-sm text-gray-500">
-                                      파일을 찾을 수 없습니다.
-                                    </div>
-                                  )}
-                                </div>
-                                {selectedFileForNode && (
-                                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                                    선택된 파일: <span className="font-mono">{selectedFileForNode}</span>
-                                  </div>
-                                )}
+                            <div>
+                              <label className="text-sm font-medium mb-2 block">파일 선택</label>
+                              <div className="flex space-x-2">
+                                <Input
+                                  placeholder="파일 경로..."
+                                  className="flex-1"
+                                  value={selectedFilePath}
+                                  onChange={(e) => setSelectedFilePath(e.target.value)}
+                                />
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={handleFileSelectForNode}
+                                  disabled={!selectedProjectId}
+                                  title={!selectedProjectId ? "먼저 프로젝트를 선택해주세요" : "파일 선택"}
+                                >
+                                  <FolderOpen className="h-4 w-4" />
+                                </Button>
                               </div>
-                            )}
-                            
+                            </div>
                             <Button 
                               className="w-full"
                               onClick={handleCreateFileNode}
-                              disabled={!selectedProjectId || !selectedFileForNode}
+                              disabled={!selectedProjectId || !selectedFilePath}
                             >
                               <FileText className="h-4 w-4 mr-2" />
                               FILE 노드 생성
@@ -748,28 +525,16 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                         </div>
                       )}
 
-                      {/* 새 파일 생성 UI */}
                       {fileCreationMode === 'create-new' && (
                         <div className="border rounded-lg p-4 bg-gray-50">
                           <h5 className="font-medium mb-3">새 파일 생성</h5>
                           <div className="space-y-3">
                             <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-sm font-medium">프로젝트 선택</label>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setActiveSection('projects')}
-                                  className="text-xs h-7"
-                                >
-                                  <Settings className="h-3 w-3 mr-1" />
-                                  프로젝트 관리
-                                </Button>
-                              </div>
+                              <label className="text-sm font-medium mb-2 block">프로젝트 선택</label>
                               <select 
                                 className="w-full p-2 border rounded-md"
                                 value={selectedProjectId}
-                                onChange={(e) => handleProjectChange(e.target.value)}
+                                onChange={(e) => setSelectedProjectId(e.target.value)}
                               >
                                 <option value="">프로젝트를 선택하세요</option>
                                 {projects.map((project) => (
@@ -778,20 +543,6 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                                   </option>
                                 ))}
                               </select>
-                              {projects.length === 0 && (
-                                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md text-center">
-                                  <p className="text-sm text-gray-600 mb-2">등록된 프로젝트가 없습니다.</p>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setActiveSection('projects')}
-                                    className="text-xs"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    프로젝트 추가하기
-                                  </Button>
-                                </div>
-                              )}
                             </div>
                             <div>
                               <label className="text-sm font-medium mb-2 block">저장 폴더</label>
@@ -850,7 +601,6 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                 </div>
               )}
 
-              {/* API 탭 콘텐츠 */}
               {activeNodeTab === 'api' && (
                 <div className="space-y-6">
                   <div>
@@ -914,7 +664,6 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                 </div>
               )}
 
-              {/* DB 탭 콘텐츠 */}
               {activeNodeTab === 'db' && (
                 <div className="space-y-6">
                   <div>
@@ -1292,32 +1041,6 @@ const SettingsModal = ({ isOpen, onClose, onCreateFileNode }: SettingsModalProps
                   {isAddingNew ? '추가' : '저장'}
                 </Button>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      {/* 확인 다이얼로그 */}
-      {confirmDialog.isOpen && (
-        <Dialog open={true} onOpenChange={closeConfirmDialog}>
-          <DialogContent className="sm:max-w-[400px]">
-            <DialogHeader>
-              <DialogTitle>{confirmDialog.title}</DialogTitle>
-            </DialogHeader>
-            
-            <div className="py-4">
-              <p className="text-sm text-gray-600 whitespace-pre-line">
-                {confirmDialog.message}
-              </p>
-            </div>
-            
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={closeConfirmDialog}>
-                취소
-              </Button>
-              <Button onClick={confirmDialog.onConfirm}>
-                확인
-              </Button>
             </div>
           </DialogContent>
         </Dialog>

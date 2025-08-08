@@ -55,6 +55,33 @@ function FlowCanvas() {
 		return newNodeId;
 	}, [nodes.length, setNodes, setEdges]);
 
+	// 파일 노드 생성 함수 (설정 모달에서 사용)
+	const createFileNode = useCallback((filePath: string, fileName: string, fileExtension: string) => {
+		const newNodeId = `node-${Date.now()}`;
+		
+		// 파일 확장자를 ts/js로 매핑
+		const mappedExtension = (fileExtension === 'tsx' || fileExtension === 'ts') ? 'ts' : 'js';
+		
+		const newNode = {
+			id: newNodeId,
+			type: 'languageNode',
+			position: { x: Math.random() * 400, y: Math.random() * 400 }, // 랜덤 위치
+			data: {
+				fileName: fileName.split('.')[0], // 확장자 제거
+				fileExtension: mappedExtension as any,
+				filePath: filePath,
+				requestProperties: []
+			}
+		};
+		
+		setNodes((nds) => [...nds, newNode]);
+		
+		// DagService에도 동기화
+		DagServiceInstance.addNode(newNode);
+		
+		return newNodeId;
+	}, [setNodes]);
+
 	const nodeTypes = useMemo(
 		() => ({
 			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} />
@@ -122,7 +149,7 @@ function FlowCanvas() {
 					<Background />
 				</ReactFlow>
 			</div>
-			<Toolbar />
+			<Toolbar onCreateFileNode={createFileNode} />
 		</div>
 	);
 }

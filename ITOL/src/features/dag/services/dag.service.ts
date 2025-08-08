@@ -135,6 +135,30 @@ class DagService {
     }
   }
 
+  public addNode(nodeData: Node<FileNodeData>): void {
+    this.graphNodeData.push(nodeData);
+    this.graphAdjacencyList.set(nodeData.id, []);
+    console.log(`Node added: ${nodeData.id}`, nodeData);
+  }
+
+  public createFileNode(filePath: string, fileName: string, fileExtension: string): string {
+    const nodeId = `node-${Date.now()}`;
+    const newNode: Node<FileNodeData> = {
+      id: nodeId,
+      type: 'languageNode',
+      position: { x: Math.random() * 400, y: Math.random() * 400 }, // 랜덤 위치
+      data: {
+        fileName: fileName.split('.')[0], // 확장자 제거
+        fileExtension: fileExtension as any,
+        filePath: filePath,
+        requestProperties: []
+      }
+    };
+    
+    this.addNode(newNode);
+    return nodeId;
+  }
+
   public runNode(nodeId: string): void {
     // Logic to run a specific node in the DAG
     const node = this.graphNodeData.find((n) => n.id === nodeId);
