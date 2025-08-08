@@ -132,6 +132,9 @@ class DagService {
       throw Error("Cyclic dependency detected in the edges. Please check the graph structure.");
     } else {
       this.graphEdgeData = edges;
+      // 엣지 데이터가 변경될 때마다 그래프 구조를 재구성
+      this.initDagGraph();
+      console.log("Graph updated. New Adjacency List:", this.graphAdjacencyList);
     }
   }
 
@@ -139,6 +142,30 @@ class DagService {
     this.graphNodeData.push(nodeData);
     this.graphAdjacencyList.set(nodeData.id, []);
     console.log(`Node added: ${nodeData.id}`, nodeData);
+    // 노드 추가 후 그래프 구조 재구성
+    this.initDagGraph();
+  }
+
+  public removeNode(nodeId: string): void {
+    // 노드 데이터에서 제거
+    this.graphNodeData = this.graphNodeData.filter(node => node.id !== nodeId);
+    
+    // 인접 리스트에서 제거
+    this.graphAdjacencyList.delete(nodeId);
+    
+    // 다른 노드들의 인접 리스트에서도 제거
+    for (const [key, neighbors] of this.graphAdjacencyList.entries()) {
+      this.graphAdjacencyList.set(key, neighbors.filter(neighbor => neighbor !== nodeId));
+    }
+    
+    // 해당 노드와 관련된 엣지들 제거
+    this.graphEdgeData = this.graphEdgeData.filter(
+      edge => edge.source !== nodeId && edge.target !== nodeId
+    );
+    
+    console.log(`Node removed: ${nodeId}`);
+    // 그래프 구조 재구성
+    this.initDagGraph();
   }
 
   public createFileNode(filePath: string, fileName: string, fileExtension: string): string {
@@ -169,27 +196,58 @@ class DagService {
       console.log(
         `Running node with id: ${nodeId}, filePath: ${node.data.filePath}, fileName: ${node.data.fileName}, fileExtension: ${node.data.fileExtension}` 
       );
+      
+      // 실제 노드 실행 로직 시뮬레이션
       setTimeout(() => {
         console.log(`Node ${nodeId} executed successfully.`);
         useNodeStore.getState().setNodeResult(nodeId, {
           status: "success",
           result: `Result of node ${nodeId}`,
         });
+        
+        // 현재 노드 실행 완료 후 다음 노드들을 실행
         const nextNodeIds = this.getNextNodeIds(nodeId);
+        console.log(`Next nodes to execute: ${nextNodeIds}`);
+        
         nextNodeIds.forEach(nextNodeId => {
           console.log(`Triggering next node with id: ${nextNodeId}`);
+          // 재귀적으로 다음 노드 실행
           DagServiceInstance.runNode(nextNodeId);
         });
       }, 1000); // Simulate async operation
     } else {
       console.error(`Node with id ${nodeId} not found.`);
+      useNodeStore.getState().setNodeResult(nodeId, {
+        status: "error",
+        result: `Node ${nodeId} not found`,
+      });
     }
-  
   }
 
   public getNextNodeIds(nodeId: string): string[] {
-
-    return this.topologicalSort(nodeId);
+    // 현재 노드에서 직접 연결된 다음 노드들을 반환
+    const directlyConnectedNodes = this.graphAdjacencyList.get(nodeId) || [];
+    console.log(`Direct connections from ${nodeId}:`, directlyConnectedNodes);
+    
+    // 다음 노드들 중에서 실행 가능한 노드들만 필터링
+    const executableNodes: string[] = [];
+    
+    for (const nextNodeId of directlyConnectedNodes) {
+      // 해당 노드로 들어오는 모든 엣지의 source 노드들이 실행 완료되었는지 확인
+      const incomingEdges = this.graphEdgeData.filter(edge => edge.target === nextNodeId);
+      const allSourcesCompleted = incomingEdges.every(edge => {
+        const sourceResult = useNodeStore.getState().nodeResults[edge.source];
+        return sourceResult && sourceResult.status === "success";
+      });
+      
+      if (allSourcesCompleted) {
+        executableNodes.push(nextNodeId);
+      } else {
+        console.log(`Node ${nextNodeId} is not ready for execution. Waiting for dependencies.`);
+      }
+    }
+    
+    return executableNodes;
   }
 
   private initDagGraph() {
@@ -206,6 +264,22 @@ class DagService {
   }
 
   /**
+   * 그래프 실행을 시작합니다. 모든 노드의 결과를 초기화하고 루트 노드부터 실행을 시작합니다.
+   */
+  public startExecution(startNodeId: string): void {
+    console.log(`Starting execution from node: ${startNodeId}`);
+    
+    // 모든 노드 결과 초기화
+    useNodeStore.getState().clearNodeResults();
+    
+    // 그래프 구조 재구성
+    this.initDagGraph();
+    
+    // 시작 노드 실행
+    this.runNode(startNodeId);
+  }
+
+  /**
    * Initializes the topological sort by calculating the indegree of each node.
    */
   public initTopologicalSort() {
@@ -219,20 +293,7 @@ class DagService {
       console.log("Processing edge:", edge, "Current Indegree Map:", this.indgreeMap);
       this.indgreeMap.set(edge.target, this.indgreeMap.get(edge.target)! + 1);
     }
-  }
-
-  private topologicalSort(startNodeId: string): string[] {
-    const childeNodes = this.graphAdjacencyList.get(startNodeId) || [];
-    const nextNodeQueue: string[] = [];
-    for( const childNodeId of childeNodes) {
-      // 현재 노드의 자식 노드의 indegree를 -1
-      this.indgreeMap.set(childNodeId, this.indgreeMap.get(childNodeId)! - 1);
-      // 자식 노드의 indegree가 0이면 다음 노드 큐에 추가
-      if (this.indgreeMap.get(childNodeId) === 0) {
-        nextNodeQueue.push(childNodeId);
-      }
-    }
-    return nextNodeQueue;
+    console.log("Topological sort initialized. Indegree map:", this.indgreeMap);
   }
 
   public getFrontNodeParameters(targetNodeId: string) {
@@ -240,7 +301,7 @@ class DagService {
       .filter(edge => edge.target === targetNodeId)
       .map(edge => edge.source);
     
-    const parameters = [];
+    const parameters: any[] = [];
     for(const frontNode of frontNodes) {
       const node = this.graphNodeData.find(n => n.id === frontNode);
       if (node) {

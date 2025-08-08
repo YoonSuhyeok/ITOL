@@ -42,14 +42,31 @@ function FlowCanvas() {
 		
 		setNodes((nds) => [...nds, newNode]);
 		
+		// DagService에도 노드 추가
+		DagServiceInstance.addNode(newNode);
+		
 		// 소스 노드가 있으면 자동으로 연결
 		if (sourceNodeId) {
-			setEdges((eds) => addEdge({
-				id: `${sourceNodeId}-${newNodeId}`,
-				source: sourceNodeId,
-				target: newNodeId,
-				markerEnd: { type: MarkerType.ArrowClosed },
-			}, eds));
+			setEdges((eds) => {
+				const newEdges = addEdge({
+					id: `${sourceNodeId}-${newNodeId}`,
+					source: sourceNodeId,
+					target: newNodeId,
+					markerEnd: { type: MarkerType.ArrowClosed },
+				}, eds);
+				
+				// DagService에 엣지 데이터 동기화
+				try {
+					DagServiceInstance.setEdgeData(newEdges);
+					console.log("Auto-connection successful");
+				} catch (error) {
+					console.error("Failed to auto-connect:", error);
+					// 오류 발생 시 엣지 연결 취소
+					return eds;
+				}
+				
+				return newEdges;
+			});
 		}
 		
 		return newNodeId;
@@ -84,9 +101,9 @@ function FlowCanvas() {
 
 	const nodeTypes = useMemo(
 		() => ({
-			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} />
+			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
 		}),
-		[setNodes]
+		[setNodes, setEdges]
 	);
 
 	const onConnect = useCallback(
@@ -99,7 +116,17 @@ function FlowCanvas() {
 			  },
 			  oldEdges
 			);
-			DagServiceInstance.setEdgeData(newEdges); // 서비스에 동기화
+			
+			// DagService에 엣지 데이터 동기화
+			try {
+			  DagServiceInstance.setEdgeData(newEdges);
+			  console.log("Edge connection successful:", connection);
+			} catch (error) {
+			  console.error("Failed to add edge:", error);
+			  // 순환 참조 등의 오류가 발생하면 엣지 추가를 취소
+			  return oldEdges;
+			}
+			
 			return newEdges;
 		  });
 		},
