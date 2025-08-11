@@ -1,5 +1,6 @@
-import { readDir, stat } from '@tauri-apps/plugin-fs';
-import { join } from '@tauri-apps/api/path';
+import { stat } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
+import { checkPathAccess } from '../../lib/path-access';
 import type { FileSystemItem } from './types';
 
 /**
@@ -13,29 +14,37 @@ export async function loadFolderFiles(folderPath: string, filterFiles: boolean =
     return [];
   }
 
+  // 경로 접근 권한 확인
+  const hasAccess = await checkPathAccess(folderPath);
+  if (!hasAccess) {
+    console.error(`❌ Access denied to path: ${folderPath}`);
+    throw new Error(`접근 권한이 없습니다: ${folderPath}`);
+  }
+
   try {
-    const entries = await readDir(folderPath);
-    console.log(`📋 Read ${entries.length} directory entries from: ${folderPath}`);
+    // Rust의 list_items_single_level_command를 사용하여 한 레벨의 파일과 디렉토리 목록 가져오기
+    const itemPaths = await invoke<string[]>('list_items_single_level_command', { path: folderPath });
+    console.log(`📋 Read ${itemPaths.length} items from: ${folderPath}`);
     
     const items: FileSystemItem[] = [];
     
-    for (const entry of entries) {
+    for (const itemPath of itemPaths) {
       try {
-        const fullPath = await join(folderPath, entry.name);
-        const stats = await stat(fullPath);
+        const stats = await stat(itemPath);
+        const itemName = itemPath.split(/[/\\]/).pop() || '';
         
-        console.log(`  ${stats.isDirectory ? '📁' : '📄'} ${entry.name} (${stats.isDirectory ? 'directory' : 'file'})`);
+        console.log(`  ${stats.isDirectory ? '📁' : '📄'} ${itemName} (${stats.isDirectory ? 'directory' : 'file'})`);
         
         items.push({
-          name: entry.name,
-          path: fullPath,
+          name: itemName,
+          path: itemPath,
           isDirectory: stats.isDirectory,
           children: stats.isDirectory ? undefined : undefined, // 초기에는 undefined로 설정
           isExpanded: false,
           isChildrenLoaded: false // 아직 하위 내용이 로드되지 않음
         });
       } catch (error) {
-        console.warn(`⚠️ Failed to stat ${entry.name}:`, error);
+        console.warn(`⚠️ Failed to stat ${itemPath}:`, error);
         // 에러가 발생한 파일은 스킵하고 계속 진행
       }
     }

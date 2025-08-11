@@ -65,6 +65,88 @@ pub fn list_dirs() -> Result<Vec<PathBuf>, String> {
     walk_dir2(&js_dir)
 }
 
+pub fn list_files_in_path(path: &Path) -> Result<Vec<PathBuf>, String> {
+    walk_dir(path)
+}
+
+pub fn list_dirs_in_path(path: &Path) -> Result<Vec<PathBuf>, String> {
+    walk_dir2(path)
+}
+
+pub fn list_all_items_in_path(path: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut items = Vec::new();
+
+    for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let entry_path = entry.path();
+        
+        if let Some(name) = entry_path.file_name() {
+            if name == ".git" || name == "swagger" || name == "node_modules" {
+                continue;
+            }
+        }
+        
+        items.push(entry_path.clone());
+        
+        // 디렉토리인 경우 재귀적으로 하위 항목들도 추가
+        if entry_path.is_dir() {
+            let sub_items = list_all_items_in_path(&entry_path)?;
+            items.extend(sub_items);
+        }
+    }
+    
+    Ok(items)
+}
+
+pub fn list_items_single_level(path: &Path) -> Result<Vec<PathBuf>, String> {
+    println!("🔍 list_items_single_level: Reading directory: {}", path.display());
+    
+    // 경로가 존재하는지 확인
+    if !path.exists() {
+        let error_msg = format!("Path does not exist: {}", path.display());
+        println!("❌ {}", error_msg);
+        return Err(error_msg);
+    }
+    
+    // 경로가 디렉토리인지 확인
+    if !path.is_dir() {
+        let error_msg = format!("Path is not a directory: {}", path.display());
+        println!("❌ {}", error_msg);
+        return Err(error_msg);
+    }
+    
+    println!("✅ Path exists and is a directory");
+    let mut items = Vec::new();
+
+    let entries = fs::read_dir(path).map_err(|e| {
+        let error_msg = format!("Failed to read directory {}: {}", path.display(), e);
+        println!("❌ {}", error_msg);
+        error_msg
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            let error_msg = format!("Failed to read entry: {}", e);
+            println!("❌ {}", error_msg);
+            error_msg
+        })?;
+        let entry_path = entry.path();
+        
+        if let Some(name) = entry_path.file_name() {
+            if name == ".git" || name == "swagger" || name == "node_modules" {
+                println!("⏭️ Skipping filtered directory: {}", name.to_string_lossy());
+                continue;
+            }
+        }
+        
+        println!("✅ Found item: {}", entry_path.display());
+        items.push(entry_path);
+    }
+    
+    println!("📊 Total items found: {}", items.len());
+    Ok(items)
+}
+
 pub async fn rename_file(file_path: String, new_file_name: String) -> Result<String, String> {
     // Get the directory path and file extension from the original path
     let path = Path::new(&file_path);

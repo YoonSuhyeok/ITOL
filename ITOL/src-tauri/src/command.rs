@@ -11,12 +11,97 @@ pub fn get_sqlite_path_command() -> String {
 
 #[command]
 pub fn list_js_files_command() -> Result<Vec<std::path::PathBuf>, String> {
-    folder::file::list_js_files()
+    // 설정 파일에서 경로를 가져와서 list_files_in_path_command 사용
+    let js_dir_str = folder::get_js_config_path().map_err(|e| e.to_string())?;
+    let path_buf = std::path::Path::new(&js_dir_str);
+    folder::file::list_files_in_path(path_buf)
 }
 
 #[command]
 pub fn list_dirs_command() -> Result<Vec<std::path::PathBuf>, String> {
-    folder::file::list_dirs()
+    // 설정 파일에서 경로를 가져와서 walk_dir2 함수 직접 사용
+    let js_dir_str = folder::get_js_config_path().map_err(|e| e.to_string())?;
+    let path_buf = std::path::Path::new(&js_dir_str);
+    folder::file::list_dirs_in_path(path_buf)
+}
+
+#[command]
+pub fn list_files_in_path_command(path: String) -> Result<Vec<std::path::PathBuf>, String> {
+    let path_buf = std::path::Path::new(&path);
+    folder::file::list_files_in_path(path_buf)
+}
+
+#[command]
+pub fn list_dirs_in_path_command(path: String) -> Result<Vec<std::path::PathBuf>, String> {
+    let path_buf = std::path::Path::new(&path);
+    folder::file::list_dirs_in_path(path_buf)
+}
+
+#[command]
+pub fn list_all_items_in_path_command(path: String) -> Result<Vec<std::path::PathBuf>, String> {
+    let path_buf = std::path::Path::new(&path);
+    folder::file::list_all_items_in_path(path_buf)
+}
+
+#[command]
+pub fn list_items_single_level_command(path: String) -> Result<Vec<std::path::PathBuf>, String> {
+    let path_buf = std::path::Path::new(&path);
+    folder::file::list_items_single_level(path_buf)
+}
+
+#[command]
+pub async fn select_folder_dialog() -> Result<String, String> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+    
+    // TODO: 실제 폴더 선택 다이얼로그 구현
+    // 현재는 임시로 고정된 경로 반환
+    let default_path = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| "C:\\Users".to_string());
+    
+    println!("🔍 Folder dialog would open, returning default path: {}", default_path);
+    Ok(default_path)
+}
+
+#[command]
+pub async fn request_path_access(path: String) -> Result<bool, String> {
+    use std::path::Path;
+    
+    // 경로가 유효한지 확인
+    let path_obj = Path::new(&path);
+    if !path_obj.exists() {
+        return Err("경로가 존재하지 않습니다".to_string());
+    }
+    
+    if !path_obj.is_dir() {
+        return Err("디렉토리가 아닙니다".to_string());
+    }
+    
+    // 여기서 Tauri에게 해당 경로에 대한 접근 권한을 요청
+    // 실제로는 사용자에게 권한 요청 다이얼로그를 표시하고
+    // 승인하면 해당 경로를 허용된 경로 목록에 추가
+    
+    println!("🔓 Requesting access to path: {}", path);
+    Ok(true)
+}
+
+#[command]
+pub fn check_path_access(path: String) -> Result<bool, String> {
+    use std::path::Path;
+    
+    let path_obj = Path::new(&path);
+    
+    // 경로에 접근할 수 있는지 확인
+    match std::fs::read_dir(path_obj) {
+        Ok(_) => {
+            println!("✅ Access granted to path: {}", path);
+            Ok(true)
+        },
+        Err(e) => {
+            println!("❌ Access denied to path: {} - {}", path, e);
+            Ok(false)
+        }
+    }
 }
 
 #[command]
