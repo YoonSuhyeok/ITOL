@@ -1,6 +1,7 @@
 pub mod database;
 pub mod folder;
 pub mod execution;
+pub mod project_manager;
 
 use tauri::command;
 
@@ -150,4 +151,77 @@ pub async fn execute_api_command(params: execution::api_system::ExecuteApiParams
     } else {
         Err("Invalid method".to_string())
     }
+}
+
+// Project Manager Commands
+#[command]
+pub async fn add_project_command(
+    app_handle: tauri::AppHandle,
+    name: String,
+    path: String,
+    description: Option<String>,
+    project_type: String,
+    access_type: String,
+) -> Result<project_manager::Project, String> {
+    project_manager::add_project_command(app_handle, name, path, description, project_type, access_type).await
+}
+
+#[command]
+pub async fn remove_project_command(
+    app_handle: tauri::AppHandle,
+    project_id: String,
+) -> Result<bool, String> {
+    project_manager::remove_project_command(app_handle, project_id).await
+}
+
+#[command]
+pub async fn get_projects_command(
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<project_manager::Project>, String> {
+    project_manager::get_projects_command(app_handle).await
+}
+
+#[command]
+pub async fn toggle_project_favorite_command(
+    app_handle: tauri::AppHandle,
+    project_id: String,
+) -> Result<bool, String> {
+    project_manager::toggle_project_favorite_command(app_handle, project_id).await
+}
+
+#[command]
+pub async fn add_allowed_path_command(
+    app_handle: tauri::AppHandle,
+    path: String,
+    name: String,
+    access_type: String,
+) -> Result<(), String> {
+    project_manager::add_allowed_path_command(app_handle, path, name, access_type).await
+}
+
+#[command]
+pub async fn remove_allowed_path_command(
+    app_handle: tauri::AppHandle,
+    path: String,
+) -> Result<bool, String> {
+    project_manager::remove_allowed_path_command(app_handle, path).await
+}
+
+#[command]
+pub async fn get_allowed_paths_command(
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<project_manager::AllowedPath>, String> {
+    project_manager::get_allowed_paths_command(app_handle).await
+}
+
+#[command]
+pub async fn request_project_folder_command(
+    app_handle: tauri::AppHandle,
+) -> Result<Option<String>, String> {
+    project_manager::request_project_folder_internal(app_handle).await
+}
+
+#[command]
+pub async fn detect_project_type_command(path: String) -> Result<String, String> {
+    project_manager::detect_project_type_internal(path).await
 }

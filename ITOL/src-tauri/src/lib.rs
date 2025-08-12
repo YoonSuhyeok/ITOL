@@ -31,7 +31,16 @@ pub fn run() {
             command::get_config_path_command,
             command::execute_js_command,
             command::execute_ts_command,
-            command::execute_api_command
+            command::execute_api_command,
+            command::add_project_command,
+            command::remove_project_command,
+            command::get_projects_command,
+            command::toggle_project_favorite_command,
+            command::add_allowed_path_command,
+            command::remove_allowed_path_command,
+            command::get_allowed_paths_command,
+            command::request_project_folder_command,
+            command::detect_project_type_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

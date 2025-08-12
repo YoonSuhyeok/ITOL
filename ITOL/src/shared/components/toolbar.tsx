@@ -2,6 +2,7 @@ import { Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import SettingsModal from "./settings-modal";
+import ProjectManagerComponent from "./project-manager";
 
 interface ToolbarProps {
   onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
@@ -22,6 +23,7 @@ const Toolbar = ({ onCreateFileNode }: ToolbarProps) => {
     <>
       <div className="fixed bottom-0 left-0 right-0 h-12 bg-white border-t border-gray-200 flex items-center justify-center px-4 z-50">
         <div className="flex items-center gap-2">
+          <ProjectManagerComponent />
           <Button
             variant="outline"
             size="sm"
