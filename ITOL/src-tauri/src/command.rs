@@ -137,7 +137,7 @@ pub async fn execute_js_command(params: execution::node_system::ExecuteFileParam
 
 #[command]
 pub async fn execute_ts_command(params: execution::node_system::ExecuteFileParams) -> Result<String, String> {
-    execution::node_system::execute_ts(params).await
+    execution::node_system::execute_file_by_type(params).await
 }
 
 #[command]

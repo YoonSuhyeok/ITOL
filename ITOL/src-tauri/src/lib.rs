@@ -2,6 +2,10 @@ mod command;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 로깅 초기화 (개발 중에만)
+    #[cfg(debug_assertions)]
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+
     tauri::Builder::default()
         .setup(|app| {
             // 앱 시작 후 비동기 초기화 실행

@@ -31,6 +31,8 @@ once_cell = "1.21.0"
 tokio = "1.44.0"
 reqwest = "0.12.15"
 chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+env_logger = "0.10"
 
 # Force compatible versions to avoid edition2024 issues
 [dependencies.base64ct]

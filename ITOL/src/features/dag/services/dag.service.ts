@@ -2,6 +2,8 @@ import FileNodeData from "@/entities/language/model/file-type";
 import { useNodeStore } from "@/shared/store/use-node-store";
 import Parameter from "@/shared/types/node-parameter-type";
 import { Edge, MarkerType, Node } from "@xyflow/react";
+import { invoke } from '@tauri-apps/api/core';
+import { projectManager } from "@/shared/services/project-manager.service";
 
 /**
  * DagService is a singleton service that manages the Directed Acyclic Graph (DAG) data.
@@ -186,7 +188,7 @@ class DagService {
     return nodeId;
   }
 
-  public runNode(nodeId: string): void {
+  public async runNode(nodeId: string): Promise<void> {
     // Logic to run a specific node in the DAG
     const node = this.graphNodeData.find((n) => n.id === nodeId);
     if (node) {
@@ -197,24 +199,75 @@ class DagService {
         `Running node with id: ${nodeId}, filePath: ${node.data.filePath}, fileName: ${node.data.fileName}, fileExtension: ${node.data.fileExtension}` 
       );
       
-      // 실제 노드 실행 로직 시뮬레이션
-      setTimeout(() => {
+      try {
+        // 프로젝트 경로 찾기 - 파일 경로에서 프로젝트 경로 추출
+        const projects = await projectManager.loadProjects();
+        const currentProject = projects.find(project => 
+          node.data.filePath.startsWith(project.path)
+        );
+        const projectPath = currentProject?.path || "";
+
+        // 노드의 파라미터들을 JSON으로 변환
+        const nodeParameters = this.getNodeParameters(nodeId);
+        const paramJson = JSON.stringify(nodeParameters.reduce((acc, param) => {
+          if (param.key) {
+            acc[param.key] = param.value || "";
+          }
+          return acc;
+        }, {} as Record<string, any>));
+
+        // 실제 Tauri 명령어 실행
+        let result: string;
+        if (node.data.fileExtension === 'ts') {
+          result = await invoke<string>('execute_ts_command', {
+            params: {
+              project_path: projectPath,
+              file_path: node.data.filePath,
+              param: paramJson,
+              project_id: currentProject ? parseInt(currentProject.id) : null,
+              page_id: 1, // 페이지 ID는 추후 동적으로 설정
+              node_name: node.data.fileName,
+              run_id: `run_${Date.now()}`
+            }
+          });
+        } else if (node.data.fileExtension === 'js') {
+          result = await invoke<string>('execute_js_command', {
+            params: {
+              project_path: projectPath,
+              file_path: node.data.filePath,
+              param: paramJson,
+              project_id: currentProject ? parseInt(currentProject.id) : null,
+              page_id: 1, // 페이지 ID는 추후 동적으로 설정
+              node_name: node.data.fileName,
+              run_id: `run_${Date.now()}`
+            }
+          });
+        } else {
+          throw new Error(`Unsupported file extension: ${node.data.fileExtension}`);
+        }
+
         console.log(`Node ${nodeId} executed successfully.`);
         useNodeStore.getState().setNodeResult(nodeId, {
           status: "success",
-          result: `Result of node ${nodeId}`,
+          result: result,
         });
         
         // 현재 노드 실행 완료 후 다음 노드들을 실행
         const nextNodeIds = this.getNextNodeIds(nodeId);
         console.log(`Next nodes to execute: ${nextNodeIds}`);
         
-        nextNodeIds.forEach(nextNodeId => {
+        for (const nextNodeId of nextNodeIds) {
           console.log(`Triggering next node with id: ${nextNodeId}`);
           // 재귀적으로 다음 노드 실행
-          DagServiceInstance.runNode(nextNodeId);
+          await DagServiceInstance.runNode(nextNodeId);
+        }
+      } catch (error) {
+        console.error(`Node ${nodeId} execution failed:`, error);
+        useNodeStore.getState().setNodeResult(nodeId, {
+          status: "error",
+          result: `Execution failed: ${error}`,
         });
-      }, 1000); // Simulate async operation
+      }
     } else {
       console.error(`Node with id ${nodeId} not found.`);
       useNodeStore.getState().setNodeResult(nodeId, {
@@ -266,7 +319,7 @@ class DagService {
   /**
    * 그래프 실행을 시작합니다. 모든 노드의 결과를 초기화하고 루트 노드부터 실행을 시작합니다.
    */
-  public startExecution(startNodeId: string): void {
+  public async startExecution(startNodeId: string): Promise<void> {
     console.log(`Starting execution from node: ${startNodeId}`);
     
     // 모든 노드 결과 초기화
@@ -276,7 +329,7 @@ class DagService {
     this.initDagGraph();
     
     // 시작 노드 실행
-    this.runNode(startNodeId);
+    await this.runNode(startNodeId);
   }
 
   /**
