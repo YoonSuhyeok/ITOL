@@ -3,8 +3,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use crate::command::folder::config::get_js_config_path;
 
-use super::config::get_py_config_path;
-
 fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
 

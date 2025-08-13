@@ -1,7 +1,7 @@
 use serde::Deserialize;
-use std::fs::{self, File};
+use std::fs::{self};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command};
 use crate::command::database::book;
 use crate::command::database::page;
 use crate::command::execution::request::get_local_request_json_path;
@@ -26,7 +26,7 @@ pub struct ExecuteFileParams {
 // 공통 로직을 별도 함수로 분리
 async fn prepare_execution_context(params: &ExecuteFileParams) -> Result<(String, String, String), String> {
     let project_name = match params.project_id {
-        Some(id) => book::getBookById(id)
+        Some(id) => book::get_book_by_id(id)
             .await
             .map_err(|e| e.to_string())?
             .title,
@@ -35,7 +35,7 @@ async fn prepare_execution_context(params: &ExecuteFileParams) -> Result<(String
 
     println!("Project name: {}", project_name);
     
-    let page_name = page::getPageById(params.page_id)
+    let page_name = page::get_page_by_id(params.page_id)
         .await
         .map_err(|e| e.to_string())?
         .title;

@@ -7,7 +7,7 @@ pub struct Page {
     pub title: String,
 }
 
-pub async fn getPageById(id: i32) -> Result<Page, sqlx::Error> {
+pub async fn get_page_by_id(id: i32) -> Result<Page, sqlx::Error> {
     let pool = get_db_pool().await;
 
     let page = sqlx::query("SELECT * FROM Page WHERE id = ?")

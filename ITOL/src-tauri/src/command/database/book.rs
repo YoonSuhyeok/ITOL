@@ -7,7 +7,7 @@ pub struct Book {
     pub parent_id: Option<i32>,
 }
 
-pub async fn getBookById(id: i32) -> Result<Book, sqlx::Error> {
+pub async fn get_book_by_id(id: i32) -> Result<Book, sqlx::Error> {
     // 두 번 역참조하여 내부의 Pool<Sqlite>에 대한 참조를 얻음
     let pool = get_db_pool().await;
 
