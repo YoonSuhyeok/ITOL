@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 
@@ -18,7 +18,9 @@ import {
   extractProjectNameFromPath, 
   validateProject, 
   checkProjectDuplicate, 
-  createProject 
+  createProjectWithPermissions,
+  removeProjectWithPermissions,
+  loadProjectsFromBackend
 } from './settings-modal/project-management';
 
 import { 
@@ -39,22 +41,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [fileCreationMode, setFileCreationMode] = useState<FileCreationMode>('select-existing');
   
   // 프로젝트 관리 상태
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: "1",
-      name: "ITOL Project",
-      type: "typescript",
-      path: "/Users/yoonsu/ITOL/ITOL",
-      description: "Main ITOL application"
-    },
-    {
-      id: "2", 
-      name: "TTOL Project",
-      type: "typescript",
-      path: "/Users/yoonsu/TTOL",
-      description: "TTOL project with bizcf files"
-    }
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // 컴포넌트 마운트 시 백엔드에서 프로젝트 목록 로드
+  React.useEffect(() => {
+    const loadProjects = async () => {
+      setIsLoading(true);
+      try {
+        const loadedProjects = await loadProjectsFromBackend();
+        setProjects(loadedProjects);
+      } catch (error) {
+        console.error('프로젝트 목록 로드 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadProjects();
+  }, []);
   
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -91,44 +96,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const handleQuickAdd = useCallback(async () => {
     if (formData.path.trim()) {
-      const projectName = extractProjectNameFromPath(formData.path);
-      
-      const validationErrors = await validateProject({
-        name: projectName,
-        path: formData.path,
-        type: formData.type
-      });
-      
-      if (validationErrors.length > 0) {
-        alert(validationErrors.join('\n'));
-        return;
+      setIsLoading(true);
+      try {
+        const projectName = extractProjectNameFromPath(formData.path);
+        
+        const validationErrors = await validateProject({
+          name: projectName,
+          path: formData.path,
+          type: formData.type
+        });
+        
+        if (validationErrors.length > 0) {
+          alert(validationErrors.join('\n'));
+          return;
+        }
+        
+        const duplicateError = checkProjectDuplicate(projects, {
+          name: projectName,
+          path: formData.path
+        });
+        
+        if (duplicateError) {
+          alert(duplicateError);
+          return;
+        }
+        
+        const newProject = await createProjectWithPermissions(
+          projectName,
+          formData.type,
+          formData.path,
+          formData.description
+        );
+        
+        if (newProject) {
+          setProjects(prev => [...prev, newProject]);
+          setFormData({
+            name: "",
+            type: "typescript",
+            path: "",
+            description: ""
+          });
+          setIsAddingNew(false);
+          alert('프로젝트가 성공적으로 추가되었습니다. 해당 경로에 대한 읽기 권한도 자동으로 추가되었습니다.');
+        } else {
+          alert('프로젝트 추가에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('프로젝트 추가 중 오류:', error);
+        alert('프로젝트 추가 중 오류가 발생했습니다.');
+      } finally {
+        setIsLoading(false);
       }
-      
-      const duplicateError = checkProjectDuplicate(projects, {
-        name: projectName,
-        path: formData.path
-      });
-      
-      if (duplicateError) {
-        alert(duplicateError);
-        return;
-      }
-      
-      const newProject = createProject(
-        projectName,
-        formData.type,
-        formData.path,
-        formData.description
-      );
-      
-      setProjects(prev => [...prev, newProject]);
-      setFormData({
-        name: "",
-        type: "typescript",
-        path: "",
-        description: ""
-      });
-      setIsAddingNew(false);
     }
   }, [formData, projects]);
 
@@ -143,52 +161,67 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   }, []);
 
   const handleSaveProject = useCallback(async () => {
-    if (isAddingNew) {
-      // 유효성 검사
-      const validationErrors = await validateProject(formData);
-      if (validationErrors.length > 0) {
-        alert(validationErrors.join('\n'));
-        return;
+    setIsLoading(true);
+    try {
+      if (isAddingNew) {
+        // 유효성 검사
+        const validationErrors = await validateProject(formData);
+        if (validationErrors.length > 0) {
+          alert(validationErrors.join('\n'));
+          return;
+        }
+        
+        // 중복 검사
+        const duplicateError = checkProjectDuplicate(projects, formData);
+        if (duplicateError) {
+          alert(duplicateError);
+          return;
+        }
+        
+        const newProject = await createProjectWithPermissions(
+          formData.name,
+          formData.type,
+          formData.path,
+          formData.description
+        );
+        
+        if (newProject) {
+          setProjects(prev => [...prev, newProject]);
+          alert('프로젝트가 성공적으로 추가되었습니다. 해당 경로에 대한 읽기 권한도 자동으로 추가되었습니다.');
+        } else {
+          alert('프로젝트 추가에 실패했습니다.');
+        }
+      } else if (editingProject) {
+        // 편집 모드의 경우 로컬에서만 업데이트 (백엔드 업데이트 API 추가 필요)
+        // 유효성 검사
+        const validationErrors = await validateProject(formData);
+        if (validationErrors.length > 0) {
+          alert(validationErrors.join('\n'));
+          return;
+        }
+        
+        // 중복 검사 (자신 제외)
+        const duplicateError = checkProjectDuplicate(projects, formData, editingProject.id);
+        if (duplicateError) {
+          alert(duplicateError);
+          return;
+        }
+        
+        setProjects(prev => prev.map(p => 
+          p.id === editingProject.id ? { ...editingProject, ...formData } : p
+        ));
+        alert('프로젝트 정보가 업데이트되었습니다.');
       }
       
-      // 중복 검사
-      const duplicateError = checkProjectDuplicate(projects, formData);
-      if (duplicateError) {
-        alert(duplicateError);
-        return;
-      }
-      
-      const newProject = createProject(
-        formData.name,
-        formData.type,
-        formData.path,
-        formData.description
-      );
-      
-      setProjects(prev => [...prev, newProject]);
-    } else if (editingProject) {
-      // 유효성 검사
-      const validationErrors = await validateProject(formData);
-      if (validationErrors.length > 0) {
-        alert(validationErrors.join('\n'));
-        return;
-      }
-      
-      // 중복 검사 (자신 제외)
-      const duplicateError = checkProjectDuplicate(projects, formData, editingProject.id);
-      if (duplicateError) {
-        alert(duplicateError);
-        return;
-      }
-      
-      setProjects(prev => prev.map(p => 
-        p.id === editingProject.id ? { ...editingProject, ...formData } : p
-      ));
+      setIsAddingNew(false);
+      setEditingProject(null);
+      setFormData({ name: "", type: "typescript", path: "", description: "" });
+    } catch (error) {
+      console.error('프로젝트 저장 중 오류:', error);
+      alert('프로젝트 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsAddingNew(false);
-    setEditingProject(null);
-    setFormData({ name: "", type: "typescript", path: "", description: "" });
   }, [isAddingNew, editingProject, formData, projects]);
 
   const handleCancelEdit = useCallback(() => {
@@ -197,8 +230,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setFormData({ name: "", type: "typescript", path: "", description: "" });
   }, []);
 
-  const handleDeleteProject = useCallback((projectId: string) => {
-    setProjects(prev => prev.filter(p => p.id !== projectId));
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    setIsLoading(true);
+    try {
+      const confirmed = window.confirm('정말로 이 프로젝트를 삭제하시겠습니까? 프로젝트 관련 경로 권한도 함께 제거됩니다.');
+      if (!confirmed) return;
+
+      const deleted = await removeProjectWithPermissions(projectId);
+      if (deleted) {
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+        
+      } else {
+        
+      }
+    } catch (error) {
+      console.error('프로젝트 삭제 중 오류:', error);
+      alert('프로젝트 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const handleAddNewProject = useCallback(() => {

@@ -31,19 +31,22 @@
 					"path": "$APPCONFIG/**"
 				},
 				{
-					"path": "$DOCUMENT/**"
+					"path": "$HOME/**"
 				},
 				{
-					"path": "$HOME/**"
+					"path": "$DOCUMENT/**"
 				},
 				{
 					"path": "$DESKTOP/**"
 				},
 				{
-					"path": "C:/**"
+					"path": "C:\\**"
 				},
 				{
-					"path": "D:/**"
+					"path": "D:\\**"
+				},
+				{
+					"path": "/Users/**"
 				}
 			]
 		}

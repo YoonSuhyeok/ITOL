@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -79,6 +80,35 @@ impl ProjectManager {
         Ok(Self { config_path })
     }
 
+    /// 경로에 접근할 수 있는지 확인
+    fn can_access_path(path: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let path_obj = Path::new(path);
+        
+        // 경로가 존재하는지 확인
+        if !path_obj.exists() {
+            return Ok(false);
+        }
+        
+        // 디렉토리 읽기 시도
+        match std::fs::read_dir(path_obj) {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                eprintln!("경로 접근 실패: {} - {}", path, e);
+                Ok(false)
+            }
+        }
+    }
+
+    /// 사용자에게 경로 접근 권한을 요청 (현재는 단순 확인으로 구현)
+    pub async fn request_path_permission(
+        _app_handle: &tauri::AppHandle,
+        path: &str,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        // 현재는 경로 접근 가능 여부만 확인
+        // 나중에 필요하면 사용자 다이얼로그 추가 가능
+        Self::can_access_path(path)
+    }
+
     pub async fn load_config(&self) -> Result<ProjectManagerConfig, Box<dyn std::error::Error>> {
         if !self.config_path.exists() {
             return Ok(ProjectManagerConfig::default());
@@ -107,6 +137,11 @@ impl ProjectManager {
         let path_obj = Path::new(&path);
         if !path_obj.exists() {
             return Err("프로젝트 경로가 존재하지 않습니다".into());
+        }
+
+        // 경로 접근 권한 확인
+        if !Self::can_access_path(&path)? {
+            return Err(format!("경로 '{}'에 접근할 수 없습니다. 권한을 확인해주세요.", path).into());
         }
 
         let mut config = self.load_config().await?;
@@ -301,6 +336,15 @@ pub async fn add_project_command(
     project_type: String,
     access_type: String,
 ) -> Result<Project, String> {
+    // 먼저 사용자에게 권한 요청
+    let permission_granted = ProjectManager::request_path_permission(&app_handle, &path)
+        .await
+        .map_err(|e| format!("권한 요청 실패: {}", e))?;
+    
+    if !permission_granted {
+        return Err("사용자가 경로 접근을 거부했습니다".to_string());
+    }
+
     let app_data_dir = app_handle
         .path()
         .app_data_dir()

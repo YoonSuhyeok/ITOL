@@ -1,6 +1,7 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import type { Project, ProjectType } from './types';
 import { isValidDirectory } from './file-system';
+import { projectManager } from '../../services/project-manager.service';
 
 /**
  * 프로젝트 관리 관련 유틸리티 함수들
@@ -94,21 +95,117 @@ export function checkProjectDuplicate(
 }
 
 /**
- * 새 프로젝트 생성
+ * 새 프로젝트 생성 (백엔드와 연동하여 실제로 프로젝트 및 경로 권한 추가)
  */
-export function createProject(
+export async function createProjectWithPermissions(
   name: string,
   type: ProjectType,
   path: string,
   description?: string
-): Project {
-  return {
-    id: Date.now().toString(),
-    name: name.trim(),
-    type,
-    path: path.trim(),
-    description: description?.trim() || undefined
+): Promise<Project | null> {
+  try {
+    // 프로젝트 타입을 백엔드 형식으로 변환
+    const backendProjectType = mapProjectTypeToBackend(type);
+    
+    // 백엔드에 프로젝트 추가 (자동으로 경로 권한도 추가됨)
+    const addedProject = await projectManager.addProject(
+      name.trim(),
+      path.trim(),
+      description?.trim(),
+      backendProjectType,
+      'readwrite'
+    );
+    
+    if (addedProject) {
+      // 백엔드 Project 타입을 프론트엔드 Project 타입으로 변환
+      return {
+        id: addedProject.id,
+        name: addedProject.name,
+        type: mapBackendProjectTypeToFrontend(addedProject.project_type),
+        path: addedProject.path,
+        description: addedProject.description
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('프로젝트 생성 중 오류 발생:', error);
+    throw new Error('프로젝트 생성에 실패했습니다.');
+  }
+}
+
+/**
+ * 프론트엔드 프로젝트 타입을 백엔드 형식으로 변환
+ */
+function mapProjectTypeToBackend(type: ProjectType): string {
+  const typeMapping: Record<ProjectType, string> = {
+    typescript: 'typescript',
+    javascript: 'javascript',
+    python: 'python',
+    java: 'other',
+    csharp: 'other',
+    cpp: 'other',
+    rust: 'rust',
+    go: 'other',
+    other: 'other'
   };
+  
+  return typeMapping[type];
+}
+
+/**
+ * 백엔드 프로젝트 타입을 프론트엔드 형식으로 변환
+ */
+function mapBackendProjectTypeToFrontend(backendType: any): ProjectType {
+  if (typeof backendType === 'string') {
+    switch (backendType) {
+      case 'TypeScript': return 'typescript';
+      case 'JavaScript': return 'javascript';
+      case 'Python': return 'python';
+      case 'Rust': return 'rust';
+      case 'NodeJs': return 'javascript';
+      case 'React': return 'typescript';
+      case 'Vue': return 'typescript';
+      case 'Angular': return 'typescript';
+      default: return 'other';
+    }
+  } else if (typeof backendType === 'object' && 'Other' in backendType) {
+    return 'other';
+  }
+  
+  return 'other';
+}
+
+/**
+ * 기존 프로젝트 제거 (백엔드와 연동)
+ */
+export async function removeProjectWithPermissions(projectId: string): Promise<boolean> {
+  try {
+    return await projectManager.removeProject(projectId);
+  } catch (error) {
+    console.error('프로젝트 제거 중 오류 발생:', error);
+    throw new Error('프로젝트 제거에 실패했습니다.');
+  }
+}
+
+/**
+ * 백엔드에서 프로젝트 목록 로드
+ */
+export async function loadProjectsFromBackend(): Promise<Project[]> {
+  try {
+    const backendProjects = await projectManager.loadProjects();
+    
+    return backendProjects.map(project => ({
+      id: project.id,
+      name: project.name,
+      type: mapBackendProjectTypeToFrontend(project.project_type),
+      path: project.path,
+      description: project.description
+    }));
+  } catch (error) {
+    console.error('프로젝트 목록 로드 중 오류 발생:', error);
+    return [];
+  }
 }
 
 /**
