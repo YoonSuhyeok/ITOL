@@ -92,12 +92,15 @@ fn validate_file_path(file_path: &str) -> Result<(), String> {
 }
 
 fn compile_and_run(ts_file: &str, ts_build_path: &str, json_path: &str, save_path: &str) -> Result<String, String> {
-    info!("🔨 Compiling TypeScript file: {}", ts_file);
+    info!("🔨 Processing TypeScript file: {}", ts_file);
     io::stdout().flush().unwrap();
 
-    // 파일 경로 검증 추가
-    validate_file_path(ts_file)?;
-    
+    // 먼저 ts-node로 직접 실행 시도
+    if let Ok(result) = run_typescript_directly(ts_file, json_path, save_path) {
+        return Ok(result);
+    }
+
+    // ts-node가 실패하면 컴파일 방식 사용
     let build_result = build_project(ts_build_path);
     
     if let Err(e) = build_result {
@@ -112,6 +115,11 @@ fn compile_and_run(ts_file: &str, ts_build_path: &str, json_path: &str, save_pat
     let mut js_file_path = js_file_path_buf.into_os_string().into_string().unwrap();
     if js_file_path.ends_with(".ts") {
         js_file_path = js_file_path.trim_end_matches(".ts").to_string() + ".js";
+    }
+
+    // 컴파일된 JS 파일이 존재하는지 확인
+    if !Path::new(&js_file_path).exists() {
+        return Err(format!("Compiled JS file not found: {}", js_file_path));
     }
 
     // 실행하기 전에 명령어 출력
@@ -179,24 +187,50 @@ fn should_rebuild(project_path: &str) -> Result<bool, String> {
     let package_json_path = Path::new(project_path).join("package.json");
     let tsconfig_path = Path::new(project_path).join("tsconfig.json");
     
-    if !package_json_path.exists() || !tsconfig_path.exists() {
-        return Err("Required project files (package.json, tsconfig.json) not found".to_string());
+    // 파일 존재 여부 확인 (경고만 출력하고 계속 진행)
+    if !package_json_path.exists() {
+        warn!("⚠️ package.json not found at: {}", package_json_path.display());
+    }
+    
+    if !tsconfig_path.exists() {
+        warn!("⚠️ tsconfig.json not found at: {}", tsconfig_path.display());
+    }
+    
+    // 둘 다 없으면 빌드가 필요하다고 가정
+    if !package_json_path.exists() && !tsconfig_path.exists() {
+        info!("📦 No config files found, assuming build is needed");
+        return Ok(true);
     }
     
     let mut cache = BUILD_CACHE.lock().map_err(|e| format!("Cache lock error: {}", e))?;
     
     // 마지막 빌드 시간 확인
     if let Some(&last_build) = cache.get(project_path) {
-        // package.json이나 tsconfig.json이 마지막 빌드 이후 수정되었는지 확인
-        let package_modified = std::fs::metadata(&package_json_path)
-            .and_then(|m| m.modified())
-            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            
-        let tsconfig_modified = std::fs::metadata(&tsconfig_path)
-            .and_then(|m| m.modified())
-            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        let mut needs_rebuild = false;
         
-        if package_modified <= last_build && tsconfig_modified <= last_build {
+        // package.json이 있고 수정되었는지 확인
+        if package_json_path.exists() {
+            let package_modified = std::fs::metadata(&package_json_path)
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            
+            if package_modified > last_build {
+                needs_rebuild = true;
+            }
+        }
+        
+        // tsconfig.json이 있고 수정되었는지 확인
+        if tsconfig_path.exists() {
+            let tsconfig_modified = std::fs::metadata(&tsconfig_path)
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                
+            if tsconfig_modified > last_build {
+                needs_rebuild = true;
+            }
+        }
+        
+        if !needs_rebuild {
             return Ok(false); // 리빌드 불필요
         }
     }
@@ -219,13 +253,21 @@ fn build_project(project_path: &str) -> Result<(), String> {
     info!("🔧 Building project in directory: {}", project_path);
     io::stdout().flush().unwrap();
 
+    // package.json 존재 여부 확인
+    let package_json_path = Path::new(project_path).join("package.json");
+    if !package_json_path.exists() {
+        warn!("⚠️ No package.json found, trying direct tsc compilation");
+        return build_with_tsc(project_path);
+    }
+
+    // npm 빌드 시도
     #[cfg(target_os = "windows")]
     let npm_cmd = "npm.cmd";
     #[cfg(not(target_os = "windows"))]
     let npm_cmd = "npm";
 
     let output = Command::new(npm_cmd)
-        .current_dir(project_path) // package.json이 있는 프로젝트 경로 지정
+        .current_dir(project_path)
         .arg("run")
         .arg("build")
         .output()
@@ -241,11 +283,105 @@ fn build_project(project_path: &str) -> Result<(), String> {
         info!("✅ Build succeeded");
         Ok(())
     } else {
-        error!("❌ Build failed:\n{}", String::from_utf8_lossy(&output.stderr));
-        Err(format!(
-            "Build failed:\n{}",
-            String::from_utf8_lossy(&output.stderr)
-        ))
+        warn!("❌ npm build failed, trying tsc directly");
+        build_with_tsc(project_path)
+    }
+}
+
+fn build_with_tsc(project_path: &str) -> Result<(), String> {
+    info!("🔧 Trying TypeScript compiler (tsc) directly");
+    
+    // dist 디렉토리 확인 및 생성
+    let dist_path = Path::new(project_path).join("dist");
+    if !dist_path.exists() {
+        fs::create_dir_all(&dist_path)
+            .map_err(|e| format!("Failed to create dist directory: {}", e))?;
+        info!("📁 Created dist directory: {}", dist_path.display());
+    }
+    
+    #[cfg(target_os = "windows")]
+    let tsc_cmd = "tsc.cmd";
+    #[cfg(not(target_os = "windows"))]
+    let tsc_cmd = "tsc";
+
+    let tsconfig_path = Path::new(project_path).join("tsconfig.json");
+    let mut command = Command::new(tsc_cmd);
+    command.current_dir(project_path);
+
+    if tsconfig_path.exists() {
+        // tsconfig.json이 있으면 그것을 사용
+        info!("📋 Using existing tsconfig.json");
+    } else {
+        // tsconfig.json이 없으면 기본 설정으로 컴파일
+        info!("📋 No tsconfig.json found, using default tsc settings");
+        command
+            .arg("--outDir")
+            .arg("dist")
+            .arg("--target")
+            .arg("ES2020")
+            .arg("--module")
+            .arg("CommonJS")
+            .arg("--moduleResolution")
+            .arg("node")
+            .arg("--esModuleInterop")
+            .arg("--allowSyntheticDefaultImports")
+            .arg("--strict")
+            .arg("--skipLibCheck")
+            .arg("**/*.ts");
+    }
+
+    let output = command
+        .output()
+        .map_err(|e| format!("Failed to execute tsc: {}", e))?;
+
+    debug!("TSC stdout:\n{}", String::from_utf8_lossy(&output.stdout));
+    if !output.stderr.is_empty() {
+        warn!("TSC stderr:\n{}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    if output.status.success() {
+        info!("✅ TypeScript compilation succeeded");
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        error!("❌ TypeScript compilation failed:\n{}", stderr);
+        Err(format!("TypeScript compilation failed:\n{}", stderr))
+    }
+}
+
+fn run_typescript_directly(ts_file: &str, json_path: &str, save_path: &str) -> Result<String, String> {
+    info!("🚀 Running TypeScript file directly with ts-node");
+    
+    #[cfg(target_os = "windows")]
+    let ts_node_cmd = "ts-node.cmd";
+    #[cfg(not(target_os = "windows"))]
+    let ts_node_cmd = "ts-node";
+
+    // ts-node로 직접 실행 시도
+    let output = Command::new(ts_node_cmd)
+        .arg(ts_file)
+        .arg(json_path)
+        .arg(save_path)
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            info!("✅ ts-node execution succeeded");
+            if Path::new(save_path).exists() {
+                fs::read_to_string(save_path)
+                    .map_err(|e| format!("Failed to read result file: {}", e))
+            } else {
+                Ok(String::from_utf8_lossy(&output.stdout).to_string())
+            }
+        }
+        Ok(output) => {
+            let error_message = String::from_utf8_lossy(&output.stderr);
+            Err(format!("ts-node execution failed: {}", error_message))
+        }
+        Err(_) => {
+            warn!("⚠️ ts-node not available, falling back to compilation");
+            Err("ts-node not available".to_string())
+        }
     }
 }
 
@@ -386,7 +522,7 @@ fn check_playwright_installation(project_path: &str) -> Result<(), String> {
 pub async fn execute_file_by_type(params: ExecuteFileParams) -> Result<String, String> {
     let file_path = &params.file_path;
     
-    if file_path.contains("playwright") || file_path.contains(".spec.") || file_path.contains(".test.") {
+    if file_path.contains(".spec.") || file_path.contains(".test.") {
         execute_playwright(params).await
     } else if file_path.ends_with(".ts") {
         execute_ts(params).await
@@ -413,6 +549,11 @@ pub async fn execute_ts(params: ExecuteFileParams) -> Result<String, String> {
     let response_path_str = response_path.to_string_lossy().to_string();
     
     debug!("💾 Response will be saved to: {}", response_path_str);
+
+    // 프로젝트 경로 유효성 검사
+    if !Path::new(&params.project_path).exists() {
+        return Err(format!("Project path does not exist: {}", params.project_path));
+    }
 
     compile_and_run(&params.file_path, &params.project_path, &json_path, &response_path_str)
 }
