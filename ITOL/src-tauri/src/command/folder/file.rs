@@ -2,6 +2,39 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use crate::command::folder::config::get_js_config_path;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileStats {
+    pub is_file: bool,
+    pub is_directory: bool,
+    pub size: u64,
+    pub modified: Option<u64>, // Unix timestamp
+}
+
+#[tauri::command]
+pub fn get_file_stats(path: String) -> Result<FileStats, String> {
+    let path_obj = Path::new(&path);
+    
+    if !path_obj.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+    
+    let metadata = fs::metadata(path_obj)
+        .map_err(|e| format!("Failed to get metadata for {}: {}", path, e))?;
+    
+    let modified = metadata.modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs());
+    
+    Ok(FileStats {
+        is_file: metadata.is_file(),
+        is_directory: metadata.is_dir(),
+        size: metadata.len(),
+        modified,
+    })
+}
 
 fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();

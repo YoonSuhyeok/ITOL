@@ -146,10 +146,21 @@ function handleValueSourceChange(paramId: string, source: "manual" | "linked", s
     // )
 }
   // 파라미터 삭제 함수
-function deleteParameter(id: string, parameters: Parameter[], setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>) {
-    setParameters((prev) => prev.filter((param) => param.id !== id));
+function deleteParameter(
+  id: string, 
+  parameters: Parameter[], 
+  setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>, 
+  setIsParameterSectionCollapsed: React.Dispatch<React.SetStateAction<boolean>>,
+  nodeId: string
+) {
+    setParameters((prev) => {
+      const updatedParams = prev.filter((param) => param.id !== id);
+      // DagService에도 즉시 저장
+      DagServiceInstance.setNodeParameters(nodeId, updatedParams);
+      return updatedParams;
+    });
 
-    if(parameters.length === 0) {
+    if(parameters.length === 1) { // 삭제 후 0개가 되는 경우
       setIsParameterSectionCollapsed(false); // 파라미터가 없으면 섹션을 최소화
     }
 }
@@ -176,6 +187,11 @@ const ParameterForm = ({
       setFrontParameters(frontParameters);
       setParameters(DagServiceInstance.getNodeParameters(nodeId));
     }, [nodeId]);
+
+    // 파라미터가 변경될 때마다 DagService에 저장
+    useEffect(() => {
+      DagServiceInstance.setNodeParameters(nodeId, parameters);
+    }, [nodeId, parameters]);
                   
     const [openKeyPopover, setOpenKeyPopover] = useState<string | null>(null);
 
@@ -220,8 +236,8 @@ const ParameterForm = ({
       if (customValue.trim()) {
         const currentParam = parameters.find(p => p.id === paramId);
         if (currentParam) {
-          setParameters(prev =>
-            prev.map(param =>
+          setParameters(prev => {
+            const updatedParams = prev.map(param =>
               param.id === paramId
                 ? {
                     ...param,
@@ -230,13 +246,16 @@ const ParameterForm = ({
                     checked: true
                   }
                 : param
-            )
-          );
+            );
+            // DagService에도 즉시 저장
+            DagServiceInstance.setNodeParameters(nodeId, updatedParams);
+            return updatedParams;
+          });
         }
         setCustomValueInput(prev => ({ ...prev, [paramId]: '' }));
         setOpenValuePopover(null);
       }
-    }, [parameters]);
+    }, [parameters, nodeId]);
 
     // 키 선택 드롭다운 열기/닫기 처리
     const handleKeyPopoverOpenChange = useCallback((paramId: string, open: boolean) => {
@@ -258,12 +277,15 @@ const ParameterForm = ({
 
   const handleParameterChange = useCallback(
     (key: string | null, field: keyof Parameter, value: any) => {
-      setParameters((prev) =>
-        prev.map((param) => (param.key === key ? { ...param, [field]: value } : param))
-      );
-      console.log(`Parameter ${field} changed for ${key}:`, value);
+      setParameters((prev) => {
+        const updatedParams = prev.map((param) => (param.key === key ? { ...param, [field]: value } : param));
+        // DagService에도 즉시 저장
+        DagServiceInstance.setNodeParameters(nodeId, updatedParams);
+        console.log(`Parameter ${field} changed for ${key}:`, value);
+        return updatedParams;
+      });
     },
-    []
+    [nodeId]
   );
 
   const addParameter = useCallback(() => {
@@ -282,8 +304,8 @@ const ParameterForm = ({
     
     setParameters((prev) => {
       const updatedParams = [...prev, newParameter];
-      // DagService에도 저장 (만약 setNodeParameters 메서드가 있다면)
-      // DagServiceInstance.setNodeParameters?.(nodeId, updatedParams);
+      // DagService에도 즉시 저장
+      DagServiceInstance.setNodeParameters(nodeId, updatedParams);
       return updatedParams;
     });
   }, [nodeId]);
@@ -411,13 +433,16 @@ const ParameterForm = ({
                         disabled={param.key === null}
                         value={param.value || ''}
                         onChange={(e) => {
-                          setParameters(prev =>
-                            prev.map(p =>
+                          setParameters(prev => {
+                            const updatedParams = prev.map(p =>
                               p.id === param.id
                                 ? { ...p, value: e.target.value, valueSource: "dynamic" as const }
                                 : p
-                            )
-                          );
+                            );
+                            // DagService에도 즉시 저장
+                            DagServiceInstance.setNodeParameters(nodeId, updatedParams);
+                            return updatedParams;
+                          });
                         }}
                       />
                     : 
@@ -506,7 +531,7 @@ const ParameterForm = ({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteParameter(param.id, parameters, setParameters, setIsParameterSectionCollapsed)}
+                      onClick={() => deleteParameter(param.id, parameters, setParameters, setIsParameterSectionCollapsed, nodeId)}
                     >
                       <X className="h-4 w-4" />
                     </Button>

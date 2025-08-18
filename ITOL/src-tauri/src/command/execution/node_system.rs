@@ -23,8 +23,51 @@ pub struct ExecuteFileParams {
     run_id: String
 }
 
+// 파라미터 검증 함수 추가
+fn validate_execution_params(params: &ExecuteFileParams) -> Result<(), String> {
+    // 필수 파라미터 검증
+    if params.project_path.is_empty() {
+        return Err("Project path is empty".to_string());
+    }
+    
+    if params.file_path.is_empty() {
+        return Err("File path is empty".to_string());
+    }
+    
+    if params.node_name.is_empty() {
+        return Err("Node name is empty".to_string());
+    }
+    
+    if params.run_id.is_empty() {
+        return Err("Run ID is empty".to_string());
+    }
+    
+    // 파일 존재 여부 확인
+    if !Path::new(&params.file_path).exists() {
+        return Err(format!("File does not exist: {}", params.file_path));
+    }
+    
+    // 프로젝트 경로 존재 여부 확인
+    if !Path::new(&params.project_path).exists() {
+        return Err(format!("Project path does not exist: {}", params.project_path));
+    }
+    
+    info!("✅ All execution parameters validated successfully");
+    Ok(())
+}
+
 // 공통 로직을 별도 함수로 분리
 async fn prepare_execution_context(params: &ExecuteFileParams) -> Result<(String, String, String), String> {
+    // 파라미터 로깅 추가
+    info!("📋 Execution parameters received:");
+    info!("  - project_path: {}", params.project_path);
+    info!("  - file_path: {}", params.file_path);
+    info!("  - param: {}", params.param);
+    info!("  - project_id: {:?}", params.project_id);
+    info!("  - page_id: {}", params.page_id);
+    info!("  - node_name: {}", params.node_name);
+    info!("  - run_id: {}", params.run_id);
+
     let project_name = match params.project_id {
         Some(id) => book::get_book_by_id(id)
             .await
@@ -52,11 +95,23 @@ async fn prepare_execution_context(params: &ExecuteFileParams) -> Result<(String
         params.run_id.clone()
     ).map_err(|e| e.to_string())?;
 
+    info!("📁 JSON file saved at: {}", json_path);
+
     Ok((project_name, page_name, json_path))
 }
 
 pub async fn execute_js(params: ExecuteFileParams) -> Result<String, String> {
+    info!("🚀 Starting JavaScript execution");
+    
+    // 파라미터 검증 먼저 수행
+    validate_execution_params(&params)?;
+    
     let (_, _, json_path) = prepare_execution_context(&params).await?;
+    
+    // JSON 파일 내용 검증
+    verify_json_file_content(&json_path)?;
+    
+    info!("⚡ Executing: node {} {}", params.file_path, json_path);
     
     let output = Command::new("node")
         .arg(&params.file_path)
@@ -67,10 +122,12 @@ pub async fn execute_js(params: ExecuteFileParams) -> Result<String, String> {
     if output.status.success() {
         let result = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse output: {}", e))?;
+        info!("✅ JavaScript execution completed successfully");
         Ok(result)
     } else {
         let error = String::from_utf8(output.stderr)
             .map_err(|e| format!("Failed to parse error: {}", e))?;
+        error!("❌ JavaScript execution failed: {}", error);
         Err(error)
     }
 }
@@ -123,7 +180,11 @@ fn compile_and_run(ts_file: &str, ts_build_path: &str, json_path: &str, save_pat
     }
 
     // 실행하기 전에 명령어 출력
-    info!("⚡ Executing: node {} {}", js_file_path, json_path);
+    info!("⚡ Executing: node {} {} {}", js_file_path, json_path, save_path);
+    info!("📋 Parameters being passed:");
+    info!("  - JavaScript file: {}", js_file_path);
+    info!("  - JSON parameter file: {}", json_path);
+    info!("  - Save path: {}", save_path);
     io::stdout().flush().unwrap();
 
     let json_output_parent = Path::new(json_path)
@@ -314,6 +375,13 @@ fn build_with_tsc(project_path: &str) -> Result<(), String> {
     } else {
         // tsconfig.json이 없으면 기본 설정으로 컴파일
         info!("📋 No tsconfig.json found, using default tsc settings");
+        
+        // TypeScript 파일들을 찾아서 개별적으로 추가
+        let ts_files = find_typescript_files(project_path)?;
+        if ts_files.is_empty() {
+            return Err("No TypeScript files found in project".to_string());
+        }
+        
         command
             .arg("--outDir")
             .arg("dist")
@@ -326,8 +394,12 @@ fn build_with_tsc(project_path: &str) -> Result<(), String> {
             .arg("--esModuleInterop")
             .arg("--allowSyntheticDefaultImports")
             .arg("--strict")
-            .arg("--skipLibCheck")
-            .arg("**/*.ts");
+            .arg("--skipLibCheck");
+        
+        // 각 TypeScript 파일을 개별적으로 추가
+        for ts_file in ts_files {
+            command.arg(&ts_file);
+        }
     }
 
     let output = command
@@ -356,6 +428,14 @@ fn run_typescript_directly(ts_file: &str, json_path: &str, save_path: &str) -> R
     let ts_node_cmd = "ts-node.cmd";
     #[cfg(not(target_os = "windows"))]
     let ts_node_cmd = "ts-node";
+
+    // 실행할 명령어 로그 출력
+    info!("⚡ Executing command: {} {} {} {}", ts_node_cmd, ts_file, json_path, save_path);
+    info!("📋 Command parameters:");
+    info!("  - Command: {}", ts_node_cmd);
+    info!("  - TypeScript file: {}", ts_file);
+    info!("  - JSON parameter file: {}", json_path);
+    info!("  - Save path: {}", save_path);
 
     // ts-node로 직접 실행 시도
     let output = Command::new(ts_node_cmd)
@@ -419,6 +499,9 @@ fn get_relative_file_path(file_path: &str, project_path: &str) -> Result<String,
 pub async fn execute_playwright(params: ExecuteFileParams) -> Result<String, String> {
     info!("🎭 Starting Playwright execution - File: {}", params.file_path);
     debug!("📋 Execution params: {:?}", params);
+
+    // 파라미터 검증 먼저 수행
+    validate_execution_params(&params)?;
 
     let (project_name, page_name, json_path) = prepare_execution_context(&params).await?;
     debug!("📁 Context prepared - JSON path: {}", json_path);
@@ -518,6 +601,40 @@ fn check_playwright_installation(project_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+// JSON 파일 내용 검증 함수
+fn verify_json_file_content(json_path: &str) -> Result<(), String> {
+    use std::fs;
+    
+    if !Path::new(json_path).exists() {
+        return Err(format!("JSON parameter file not found: {}", json_path));
+    }
+    
+    match fs::read_to_string(json_path) {
+        Ok(content) => {
+            info!("📄 JSON file content verification:");
+            info!("  - File path: {}", json_path);
+            info!("  - Content length: {} bytes", content.len());
+            info!("  - Content preview: {}", if content.len() > 300 { &content[..300] } else { &content });
+            
+            // JSON이 유효한지 확인
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(_) => {
+                    info!("✅ JSON content is valid");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("❌ Invalid JSON content: {}", e);
+                    Err(format!("Invalid JSON content: {}", e))
+                }
+            }
+        }
+        Err(e) => {
+            error!("❌ Failed to read JSON file: {}", e);
+            Err(format!("Failed to read JSON file: {}", e))
+        }
+    }
+}
+
 // 파일 확장자에 따른 실행 함수 선택
 pub async fn execute_file_by_type(params: ExecuteFileParams) -> Result<String, String> {
     let file_path = &params.file_path;
@@ -537,8 +654,15 @@ pub async fn execute_ts(params: ExecuteFileParams) -> Result<String, String> {
     info!("🚀 Starting TypeScript execution - File: {}", params.file_path);
     debug!("📋 Execution params: {:?}", params);
 
+    // 파라미터 검증 먼저 수행
+    validate_execution_params(&params)?;
+
     let (project_name, page_name, json_path) = prepare_execution_context(&params).await?;
     debug!("📁 Context prepared - JSON path: {}", json_path);
+    
+    // JSON 파일 내용 검증
+    verify_json_file_content(&json_path)?;
+    
     let parent_dir = Path::new(&json_path)
     .parent()
     .ok_or("Failed to get parent directory for JSON path")?;
@@ -556,4 +680,50 @@ pub async fn execute_ts(params: ExecuteFileParams) -> Result<String, String> {
     }
 
     compile_and_run(&params.file_path, &params.project_path, &json_path, &response_path_str)
+}
+
+fn find_typescript_files(project_path: &str) -> Result<Vec<String>, String> {
+    use std::fs;
+    
+    let mut ts_files = Vec::new();
+    let project_dir = Path::new(project_path);
+    
+    // 프로젝트 루트에서 .ts 파일 찾기
+    if let Ok(entries) = fs::read_dir(project_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "ts") {
+                if let Some(path_str) = path.to_str() {
+                    ts_files.push(path_str.to_string());
+                }
+            }
+        }
+    }
+    
+    // src 디렉토리에서 .ts 파일 찾기
+    let src_dir = project_dir.join("src");
+    if src_dir.exists() {
+        find_ts_files_recursive(&src_dir, &mut ts_files)?;
+    }
+    
+    Ok(ts_files)
+}
+
+fn find_ts_files_recursive(dir: &Path, ts_files: &mut Vec<String>) -> Result<(), String> {
+    use std::fs;
+    
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "ts") {
+                if let Some(path_str) = path.to_str() {
+                    ts_files.push(path_str.to_string());
+                }
+            } else if path.is_dir() {
+                find_ts_files_recursive(&path, ts_files)?;
+            }
+        }
+    }
+    
+    Ok(())
 }

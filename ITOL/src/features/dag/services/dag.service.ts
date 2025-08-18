@@ -395,6 +395,30 @@ class DagService {
     return parameters;
   }
 
+  public setNodeParameters(nodeId: string, parameters: Parameter[]): void {
+    const node = this.graphNodeData.find(n => n.id === nodeId);
+    if (!node) {
+      console.error(`Node with id ${nodeId} not found.`);
+      return;
+    }
+    
+    // Parameter[]를 RequestProperty[]로 변환
+    const requestProperties = parameters
+      .filter(param => param.key && param.checked) // 체크되고 키가 있는 파라미터만
+      .map(param => ({
+        nodeName: undefined,
+        key: param.key!,
+        type: param.type,
+        value: param.value,
+        description: `Parameter from ${param.valueSource} source`
+      }));
+    
+    // 노드의 requestProperties 업데이트
+    node.data.requestProperties = requestProperties;
+    
+    console.log(`Parameters updated for node ${nodeId}:`, requestProperties);
+  }
+
 }
 
-export const DagServiceInstance = DagService.getInstance(); 
+export const DagServiceInstance = DagService.getInstance();

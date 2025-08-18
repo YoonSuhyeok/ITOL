@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      itol-ts:
+        specifier: ^1.0.0
+        version: 1.0.0
     devDependencies:
       typescript:
         specifier: ^5.8.3
@@ -14,11 +18,17 @@ importers:
 
 packages:
 
+  itol-ts@1.0.0:
+    resolution: {integrity: sha512-PfiZ0TliOrzL277DrOdr7Ub1dLdzyCd3IGRkDig8q3jajr5pN2aj0fqGKhtFv3zLbSDqMrKl1iI3GVhBI8yQGA==}
+    engines: {node: '>=14.0.0'}
+
   typescript@5.8.3:
     resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
     engines: {node: '>=14.17'}
     hasBin: true
 
 snapshots:
+
+  itol-ts@1.0.0: {}
 
   typescript@5.8.3: {}

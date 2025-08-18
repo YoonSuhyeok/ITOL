@@ -44,7 +44,8 @@ pub fn run() {
             command::remove_allowed_path_command,
             command::get_allowed_paths_command,
             command::request_project_folder_command,
-            command::detect_project_type_command
+            command::detect_project_type_command,
+            command::folder::file::get_file_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

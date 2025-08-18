@@ -1,7 +1,19 @@
-import { stat } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import { checkPathAccess } from '../../lib/path-access';
 import type { FileSystemItem } from './types';
+
+// 자체 Rust 함수의 반환 타입
+interface FileStats {
+  is_file: boolean;
+  is_directory: boolean;
+  size: number;
+  modified?: number; // Unix timestamp
+}
+
+// Tauri stat 함수를 대체하는 래퍼 함수
+async function getStat(path: string): Promise<FileStats> {
+  return await invoke<FileStats>('get_file_stats', { path });
+}
 
 /**
  * 디렉토리의 파일과 폴더를 읽어서 FileSystemItem 배열로 반환
@@ -30,16 +42,16 @@ export async function loadFolderFiles(folderPath: string, filterFiles: boolean =
     
     for (const itemPath of itemPaths) {
       try {
-        const stats = await stat(itemPath);
+        const stats = await getStat(itemPath);
         const itemName = itemPath.split(/[/\\]/).pop() || '';
         
-        console.log(`  ${stats.isDirectory ? '📁' : '📄'} ${itemName} (${stats.isDirectory ? 'directory' : 'file'})`);
+        console.log(`  ${stats.is_directory ? '📁' : '📄'} ${itemName} (${stats.is_directory ? 'directory' : 'file'})`);
         
         items.push({
           name: itemName,
           path: itemPath,
-          isDirectory: stats.isDirectory,
-          children: stats.isDirectory ? undefined : undefined, // 초기에는 undefined로 설정
+          isDirectory: stats.is_directory,
+          children: stats.is_directory ? undefined : undefined, // 초기에는 undefined로 설정
           isExpanded: false,
           isChildrenLoaded: false // 아직 하위 내용이 로드되지 않음
         });
@@ -84,8 +96,8 @@ export async function loadProjectFiles(projectPath: string, filterFiles: boolean
 
   try {
     // 먼저 경로가 디렉토리인지 확인
-    const pathStats = await stat(projectPath);
-    if (!pathStats.isDirectory) {
+    const pathStats = await getStat(projectPath);
+    if (!pathStats.is_directory) {
       console.error(`❌ Path is not a directory: ${projectPath}`);
       throw new Error('선택한 경로가 디렉토리가 아닙니다.');
     }
@@ -281,10 +293,23 @@ export function getFileNameWithoutExtension(fileName: string): string {
  * 경로가 유효한 디렉토리인지 확인
  */
 export async function isValidDirectory(path: string): Promise<boolean> {
+  console.log(`🔍 Checking directory validity for: "${path}"`);
+  
+  if (!path || path.trim() === '') {
+    console.warn('❌ Empty path provided');
+    return false;
+  }
+  
   try {
-    const stats = await stat(path);
-    return stats.isDirectory;
-  } catch {
+    const stats = await getStat(path);
+    console.log(`✅ getStat() successful for: ${path}`, {
+      isDirectory: stats.is_directory,
+      isFile: stats.is_file,
+      size: stats.size
+    });
+    return stats.is_directory;
+  } catch (error) {
+    console.error(`❌ getStat() failed for: ${path}`, error);
     return false;
   }
 }
@@ -293,10 +318,23 @@ export async function isValidDirectory(path: string): Promise<boolean> {
  * 경로가 유효한 파일인지 확인
  */
 export async function isValidFile(path: string): Promise<boolean> {
+  console.log(`🔍 Checking file validity for: "${path}"`);
+  
+  if (!path || path.trim() === '') {
+    console.warn('❌ Empty path provided');
+    return false;
+  }
+  
   try {
-    const stats = await stat(path);
-    return stats.isFile;
-  } catch {
+    const stats = await getStat(path);
+    console.log(`✅ getStat() successful for: ${path}`, {
+      isDirectory: stats.is_directory,
+      isFile: stats.is_file,
+      size: stats.size
+    });
+    return stats.is_file;
+  } catch (error) {
+    console.error(`❌ getStat() failed for: ${path}`, error);
     return false;
   }
 }

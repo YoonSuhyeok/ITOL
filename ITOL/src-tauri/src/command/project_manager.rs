@@ -89,11 +89,26 @@ impl ProjectManager {
             return Ok(false);
         }
         
-        // 디렉토리 읽기 시도
-        match std::fs::read_dir(path_obj) {
-            Ok(_) => Ok(true),
+        // 먼저 기본적인 메타데이터 접근을 시도
+        match std::fs::metadata(path_obj) {
+            Ok(metadata) => {
+                if metadata.is_dir() {
+                    // 디렉토리인 경우에만 읽기 시도
+                    match std::fs::read_dir(path_obj) {
+                        Ok(_) => Ok(true),
+                        Err(e) => {
+                            eprintln!("디렉토리 읽기 실패: {} - {}", path, e);
+                            // 읽기 실패해도 경로가 유효하면 true 반환
+                            Ok(true)
+                        }
+                    }
+                } else {
+                    // 파일인 경우 존재하면 접근 가능
+                    Ok(true)
+                }
+            },
             Err(e) => {
-                eprintln!("경로 접근 실패: {} - {}", path, e);
+                eprintln!("경로 메타데이터 접근 실패: {} - {}", path, e);
                 Ok(false)
             }
         }

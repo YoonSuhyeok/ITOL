@@ -23,13 +23,19 @@ pub fn get_local_request_json_path(project_name: String, page_name: String) -> R
 pub fn save_request_json(path: std::path::PathBuf, node_name: String, json: String, run_id: String) -> Result<String, String> {
     use std::fs;
     
+    println!("📁 Saving request JSON with parameters:");
+    println!("  - Path: {:?}", path);
+    println!("  - Node name: {}", node_name);
+    println!("  - Run ID: {}", run_id);
+    println!("  - JSON content length: {} characters", json.len());
+    println!("  - JSON content preview: {}", if json.len() > 200 { &json[..200] } else { &json });
+    
     let run_id_path = path.join(run_id);
     println!("Creating directory: {:?}", run_id_path);
     fs::create_dir_all(&run_id_path).map_err(|e| e.to_string())?;
     
     let file_name = run_id_path.join(format!("{}.json", node_name));
     println!("About to write JSON to file: {:?}", file_name);
-    println!("JSON content:\n{}", json);
     
     fs::write(&file_name, &json)
         .map_err(|e| {
@@ -39,10 +45,10 @@ pub fn save_request_json(path: std::path::PathBuf, node_name: String, json: Stri
     
     match fs::metadata(&file_name) {
         Ok(metadata) => {
-            println!("File written successfully, size: {} bytes", metadata.len());
+            println!("✅ File written successfully, size: {} bytes", metadata.len());
         },
         Err(e) => {
-            println!("Failed to get file metadata: {}", e);
+            println!("❌ Failed to get file metadata: {}", e);
         }
     }
     
