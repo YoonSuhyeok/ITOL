@@ -45,7 +45,13 @@ pub fn run() {
             command::get_allowed_paths_command,
             command::request_project_folder_command,
             command::detect_project_type_command,
-            command::folder::file::get_file_stats
+            command::folder::file::get_file_stats,
+            command::read_text_file,
+            command::save_swagger_spec,
+            command::load_swagger_specs,
+            command::delete_swagger_spec,
+            command::update_swagger_spec,
+            command::create_api_node_from_endpoint
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

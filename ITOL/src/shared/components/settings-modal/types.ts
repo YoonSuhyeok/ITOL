@@ -35,7 +35,7 @@ export const PROJECT_TYPES: { value: ProjectType; label: string; color: string }
   { value: "other", label: "Other", color: "bg-gray-400" }
 ];
 
-export type MenuSection = 'projects' | 'node-creation' | 'general' | 'appearance' | 'editor' | 'shortcuts' | 'about';
+export type MenuSection = 'projects' | 'node-creation' | 'swagger-management' | 'general' | 'appearance' | 'editor' | 'shortcuts' | 'about';
 export type NodeType = 'file' | 'api' | 'db';
 export type FileCreationMode = 'create-new' | 'select-existing';
 
@@ -57,9 +57,89 @@ export interface ConfirmDialogState {
 
 export interface ApiNodeData {
   type: string;
-  url: string;
   method: string;
+  url: string;
   description?: string;
+  
+  // PostMan 스타일 추가 필드들
+  headers?: ApiHeader[];
+  queryParams?: ApiQueryParam[];
+  pathParams?: ApiPathParam[];
+  body?: ApiRequestBody;
+  auth?: ApiAuth;
+  timeout?: number;
+  followRedirects?: boolean;
+}
+
+export interface ApiHeader {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface ApiQueryParam {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface ApiPathParam {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface ApiRequestBody {
+  type: 'none' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary';
+  raw?: {
+    content: string;
+    language: 'json' | 'xml' | 'html' | 'text' | 'javascript';
+  };
+  formData?: ApiFormDataItem[];
+  urlencoded?: ApiUrlencodedItem[];
+}
+
+export interface ApiFormDataItem {
+  id: string;
+  key: string;
+  value: string;
+  type: 'text' | 'file';
+  enabled: boolean;
+  description?: string;
+}
+
+export interface ApiUrlencodedItem {
+  id: string;
+  key: string;
+  value: string;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface ApiAuth {
+  type: 'none' | 'bearer' | 'basic' | 'api-key' | 'oauth2';
+  bearer?: {
+    token: string;
+  };
+  basic?: {
+    username: string;
+    password: string;
+  };
+  apiKey?: {
+    key: string;
+    value: string;
+    addTo: 'header' | 'query';
+  };
+  oauth2?: {
+    accessToken: string;
+    headerPrefix?: string;
+  };
 }
 
 export interface DbNodeData {
@@ -75,4 +155,69 @@ export interface ProjectFormData {
   type: ProjectType;
   path: string;
   description: string;
+}
+
+export interface SwaggerSpec {
+  id: string;
+  name: string;
+  description?: string;
+  filePath: string;
+  version?: string;
+  baseUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isValid: boolean;
+  endpoints?: SwaggerEndpoint[];
+}
+
+export interface SwaggerEndpoint {
+  id: string;
+  path: string;
+  method: string;
+  operationId?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  parameters?: SwaggerParameter[];
+  requestBody?: SwaggerRequestBody;
+  responses?: SwaggerResponse[];
+}
+
+export interface SwaggerParameter {
+  name: string;
+  in: 'query' | 'header' | 'path' | 'cookie';
+  required: boolean;
+  schema: SwaggerSchema;
+  description?: string;
+}
+
+export interface SwaggerRequestBody {
+  required: boolean;
+  content: Record<string, SwaggerMediaType>;
+}
+
+export interface SwaggerMediaType {
+  schema: SwaggerSchema;
+  example?: any;
+}
+
+export interface SwaggerSchema {
+  type: string;
+  format?: string;
+  properties?: Record<string, SwaggerSchema>;
+  items?: SwaggerSchema;
+  required?: string[];
+  example?: any;
+}
+
+export interface SwaggerResponse {
+  statusCode: string;
+  description: string;
+  content?: Record<string, SwaggerMediaType>;
+}
+
+export interface SwaggerFormData {
+  name: string;
+  description: string;
+  filePath: string;
 }

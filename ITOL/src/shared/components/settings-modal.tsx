@@ -10,7 +10,11 @@ import type {
   NodeType, 
   FileCreationMode, 
   ConfirmDialogState,
-  ProjectFormData
+  ProjectFormData,
+  ApiNodeData,
+  SwaggerSpec,
+  SwaggerFormData,
+  SwaggerEndpoint
 } from './settings-modal/types';
 
 import { 
@@ -24,6 +28,19 @@ import {
 } from './settings-modal/project-management';
 
 import { 
+  selectSwaggerFile,
+  parseSwaggerFile,
+  saveSwaggerSpec,
+  loadSwaggerSpecs,
+  deleteSwaggerSpec,
+  updateSwaggerSpec,
+  createApiNodeFromEndpoint,
+  validateSwaggerFormData,
+  extractSwaggerNameFromPath,
+  checkSwaggerDuplicate
+} from './settings-modal/swagger-management';
+
+import { 
   createFileNode
 } from './settings-modal/node-creation';
 
@@ -32,7 +49,8 @@ import {
   ConfirmDialog, 
   NodeCreationTabs, 
   MenuSidebar,
-  NodeCreationForm
+  NodeCreationForm,
+  SwaggerManagementSection
 } from './settings-modal/dialog-components';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode }) => {
@@ -44,6 +62,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Swagger 관리 상태
+  const [swaggerSpecs, setSwaggerSpecs] = useState<SwaggerSpec[]>([]);
+  const [editingSwagger, setEditingSwagger] = useState<SwaggerSpec | null>(null);
+  const [isAddingNewSwagger, setIsAddingNewSwagger] = useState(false);
+  const [swaggerFormData, setSwaggerFormData] = useState<SwaggerFormData>({
+    name: "",
+    description: "",
+    filePath: ""
+  });
+  
   // 컴포넌트 마운트 시 백엔드에서 프로젝트 목록 로드
   React.useEffect(() => {
     const loadProjects = async () => {
@@ -52,14 +80,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         const loadedProjects = await loadProjectsFromBackend();
         setProjects(loadedProjects);
       } catch (error) {
-        console.error('프로젝트 목록 로드 실패:', error);
+        console.error('프로젝트 로드 오류:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    
-    loadProjects();
-  }, []);
+
+    const loadSwagger = async () => {
+      try {
+        const loadedSpecs = await loadSwaggerSpecs();
+        setSwaggerSpecs(loadedSpecs);
+      } catch (error) {
+        console.error('Swagger 스펙 로드 오류:', error);
+      }
+    };
+
+    if (isOpen) {
+      loadProjects();
+      loadSwagger();
+    }
+  }, [isOpen]);
   
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -297,6 +337,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     }
   }, [selectedProjectId, selectedFileForNode, projects, onCreateFileNode, onClose]);
 
+  const handleCreateApiNode = useCallback((apiData: ApiNodeData) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "API 노드 생성",
+      message: `"${apiData.method} ${apiData.url}" API 노드를 생성하시겠습니까?\n생성 후 설정 창을 닫습니다.`,
+      onConfirm: () => {
+        console.log('API 노드 생성:', apiData);
+        
+        // TODO: API 노드 생성 로직 구현
+        // const nodeId = createApiNode(apiData, onCreateApiNode);
+        // console.log(`API 노드가 생성되었습니다! Node ID: ${nodeId}`);
+        
+        closeConfirmDialog();
+        onClose();
+      }
+    });
+  }, [onClose]);
+
   const closeConfirmDialog = useCallback(() => {
     setConfirmDialog({
       isOpen: false,
@@ -305,6 +363,146 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       onConfirm: () => {}
     });
   }, []);
+
+  // Swagger 관리 핸들러들
+  const handleAddNewSwagger = useCallback(() => {
+    setIsAddingNewSwagger(true);
+    setSwaggerFormData({
+      name: "",
+      description: "",
+      filePath: ""
+    });
+  }, []);
+
+  const handleEditSwagger = useCallback((swagger: SwaggerSpec) => {
+    setEditingSwagger(swagger);
+    setSwaggerFormData({
+      name: swagger.name,
+      description: swagger.description || "",
+      filePath: swagger.filePath
+    });
+  }, []);
+
+  const handleSwaggerFormDataChange = useCallback((field: keyof SwaggerFormData, value: string) => {
+    setSwaggerFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleSelectSwaggerFile = useCallback(async () => {
+    try {
+      const filePath = await selectSwaggerFile();
+      if (filePath) {
+        setSwaggerFormData(prev => ({
+          ...prev,
+          filePath,
+          name: prev.name || extractSwaggerNameFromPath(filePath)
+        }));
+      }
+    } catch (error) {
+      console.error('Swagger 파일 선택 오류:', error);
+      alert('파일 선택에 실패했습니다.');
+    }
+  }, []);
+
+  const handleSaveSwagger = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      if (!editingSwagger) {
+        // 새 Swagger 추가
+        const validationErrors = await validateSwaggerFormData(swaggerFormData);
+        if (validationErrors.length > 0) {
+          alert(validationErrors.join('\n'));
+          return;
+        }
+
+        const duplicateError = checkSwaggerDuplicate(swaggerSpecs, swaggerFormData);
+        if (duplicateError) {
+          alert(duplicateError);
+          return;
+        }
+
+        const newSwagger = await parseSwaggerFile(swaggerFormData.filePath);
+        newSwagger.name = swaggerFormData.name;
+        newSwagger.description = swaggerFormData.description;
+
+        const saved = await saveSwaggerSpec(newSwagger);
+        if (saved) {
+          setSwaggerSpecs(prev => [...prev, newSwagger]);
+          alert('Swagger 스펙이 성공적으로 추가되었습니다.');
+        } else {
+          alert('Swagger 스펙 저장에 실패했습니다.');
+        }
+      } else {
+        // 기존 Swagger 수정
+        const validationErrors = await validateSwaggerFormData(swaggerFormData);
+        if (validationErrors.length > 0) {
+          alert(validationErrors.join('\n'));
+          return;
+        }
+
+        const duplicateError = checkSwaggerDuplicate(swaggerSpecs, swaggerFormData, editingSwagger.id);
+        if (duplicateError) {
+          alert(duplicateError);
+          return;
+        }
+
+        const updatedSwagger = { ...editingSwagger, ...swaggerFormData };
+        const updated = await updateSwaggerSpec(updatedSwagger);
+        if (updated) {
+          setSwaggerSpecs(prev => prev.map(s => s.id === editingSwagger.id ? updatedSwagger : s));
+          alert('Swagger 스펙이 업데이트되었습니다.');
+        } else {
+          alert('Swagger 스펙 업데이트에 실패했습니다.');
+        }
+      }
+
+      setIsAddingNewSwagger(false);
+      setEditingSwagger(null);
+      setSwaggerFormData({ name: "", description: "", filePath: "" });
+    } catch (error) {
+      console.error('Swagger 저장 중 오류:', error);
+      alert('Swagger 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAddingNewSwagger, editingSwagger, swaggerFormData, swaggerSpecs]);
+
+  const handleCancelSwaggerEdit = useCallback(() => {
+    setIsAddingNewSwagger(false);
+    setEditingSwagger(null);
+    setSwaggerFormData({ name: "", description: "", filePath: "" });
+  }, []);
+
+  const handleDeleteSwagger = useCallback(async (swaggerId: string) => {
+    setIsLoading(true);
+    try {
+      const confirmed = window.confirm('정말로 이 Swagger 스펙을 삭제하시겠습니까?');
+      if (!confirmed) return;
+
+      const deleted = await deleteSwaggerSpec(swaggerId);
+      if (deleted) {
+        setSwaggerSpecs(prev => prev.filter(s => s.id !== swaggerId));
+        alert('Swagger 스펙이 삭제되었습니다.');
+      } else {
+        alert('Swagger 스펙 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Swagger 삭제 중 오류:', error);
+      alert('Swagger 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleCreateApiNodeFromEndpoint = useCallback(async (endpoint: SwaggerEndpoint, spec: SwaggerSpec) => {
+    try {
+      const nodeId = await createApiNodeFromEndpoint(endpoint, spec);
+      alert(`API 노드가 생성되었습니다! (ID: ${nodeId})`);
+      onClose();
+    } catch (error) {
+      console.error('API 노드 생성 오류:', error);
+      alert('API 노드 생성에 실패했습니다.');
+    }
+  }, [onClose]);
 
   // 콘텐츠 렌더링
   const renderContent = () => {
@@ -324,6 +522,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             onQuickAdd={handleQuickAdd}
             onFolderSelect={handleFolderSelect}
             onFormDataChange={handleFormDataChange}
+          />
+        );
+      
+      case 'swagger-management':
+        return (
+          <SwaggerManagementSection
+            swaggerSpecs={swaggerSpecs}
+            editingSwagger={editingSwagger}
+            isAddingNewSwagger={isAddingNewSwagger}
+            swaggerFormData={swaggerFormData}
+            onEdit={handleEditSwagger}
+            onDelete={handleDeleteSwagger}
+            onSave={handleSaveSwagger}
+            onCancel={handleCancelSwaggerEdit}
+            onAddNew={handleAddNewSwagger}
+            onFileSelect={handleSelectSwaggerFile}
+            onFormDataChange={handleSwaggerFormDataChange}
+            onCreateApiNodeFromEndpoint={handleCreateApiNodeFromEndpoint}
           />
         );
       
@@ -349,6 +565,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                   onFileSelect={handleFileSelect}
                   onFileCreationModeChange={setFileCreationMode}
                   onCreateFileNode={handleCreateFileNode}
+                  onCreateApiNode={handleCreateApiNode}
                 />
               </div>
             </div>

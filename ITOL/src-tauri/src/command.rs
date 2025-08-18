@@ -225,3 +225,168 @@ pub async fn request_project_folder_command(
 pub async fn detect_project_type_command(path: String) -> Result<String, String> {
     project_manager::detect_project_type_internal(path).await
 }
+
+#[command]
+pub async fn read_text_file(path: String) -> Result<String, String> {
+    use std::fs;
+    use std::path::Path;
+    
+    println!("📖 Reading text file: {}", path);
+    
+    let file_path = Path::new(&path);
+    
+    // 파일이 존재하는지 확인
+    if !file_path.exists() {
+        return Err(format!("파일이 존재하지 않습니다: {}", path));
+    }
+    
+    // 파일인지 확인
+    if !file_path.is_file() {
+        return Err(format!("지정된 경로가 파일이 아닙니다: {}", path));
+    }
+    
+    // 파일 읽기
+    match fs::read_to_string(file_path) {
+        Ok(content) => {
+            println!("✅ Successfully read file: {} ({} bytes)", path, content.len());
+            Ok(content)
+        },
+        Err(e) => {
+            let error_msg = format!("파일 읽기 실패: {}", e);
+            println!("❌ {}", error_msg);
+            Err(error_msg)
+        }
+    }
+}
+
+#[command]
+pub async fn save_swagger_spec(spec: serde_json::Value) -> Result<bool, String> {
+    use std::fs;
+    use std::path::Path;
+    
+    println!("💾 Saving Swagger spec: {:?}", spec.get("name"));
+    
+    // 설정 디렉토리에 swagger 폴더 생성
+    let config_dir = database::get_config_dir().map_err(|e| e.to_string())?;
+    let swagger_dir = Path::new(&config_dir).join("swagger");
+    
+    if !swagger_dir.exists() {
+        fs::create_dir_all(&swagger_dir).map_err(|e| format!("Swagger 디렉토리 생성 실패: {}", e))?;
+    }
+    
+    // 스펙 ID를 파일명으로 사용
+    let spec_id = spec.get("id")
+        .and_then(|v| v.as_str())
+        .ok_or("Swagger 스펙에 ID가 없습니다")?;
+    
+    let file_path = swagger_dir.join(format!("{}.json", spec_id));
+    
+    // JSON 파일로 저장
+    let json_content = serde_json::to_string_pretty(&spec)
+        .map_err(|e| format!("JSON 직렬화 실패: {}", e))?;
+    
+    fs::write(&file_path, json_content)
+        .map_err(|e| format!("파일 쓰기 실패: {}", e))?;
+    
+    println!("✅ Swagger spec saved: {:?}", file_path);
+    Ok(true)
+}
+
+#[command]
+pub async fn load_swagger_specs() -> Result<Vec<serde_json::Value>, String> {
+    use std::fs;
+    use std::path::Path;
+    
+    println!("📂 Loading Swagger specs");
+    
+    let config_dir = database::get_config_dir().map_err(|e| e.to_string())?;
+    let swagger_dir = Path::new(&config_dir).join("swagger");
+    
+    if !swagger_dir.exists() {
+        println!("📁 Swagger directory doesn't exist, returning empty list");
+        return Ok(Vec::new());
+    }
+    
+    let mut specs = Vec::new();
+    
+    match fs::read_dir(&swagger_dir) {
+        Ok(entries) => {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                        match fs::read_to_string(&path) {
+                            Ok(content) => {
+                                match serde_json::from_str::<serde_json::Value>(&content) {
+                                    Ok(spec) => {
+                                        specs.push(spec);
+                                        println!("✅ Loaded spec: {:?}", path.file_name());
+                                    }
+                                    Err(e) => {
+                                        println!("⚠️ Failed to parse spec {:?}: {}", path.file_name(), e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("⚠️ Failed to read spec {:?}: {}", path.file_name(), e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            return Err(format!("Swagger 디렉토리 읽기 실패: {}", e));
+        }
+    }
+    
+    println!("📋 Loaded {} Swagger specs", specs.len());
+    Ok(specs)
+}
+
+#[command]
+pub async fn delete_swagger_spec(spec_id: String) -> Result<bool, String> {
+    use std::fs;
+    use std::path::Path;
+    
+    println!("🗑️ Deleting Swagger spec: {}", spec_id);
+    
+    let config_dir = database::get_config_dir().map_err(|e| e.to_string())?;
+    let swagger_dir = Path::new(&config_dir).join("swagger");
+    let file_path = swagger_dir.join(format!("{}.json", spec_id));
+    
+    if !file_path.exists() {
+        return Err("Swagger 스펙 파일이 존재하지 않습니다".to_string());
+    }
+    
+    fs::remove_file(&file_path)
+        .map_err(|e| format!("파일 삭제 실패: {}", e))?;
+    
+    println!("✅ Swagger spec deleted: {}", spec_id);
+    Ok(true)
+}
+
+#[command]
+pub async fn update_swagger_spec(spec: serde_json::Value) -> Result<bool, String> {
+    // 업데이트는 저장과 동일한 로직 사용
+    save_swagger_spec(spec).await
+}
+
+#[command]
+pub async fn create_api_node_from_endpoint(
+    endpoint: serde_json::Value,
+    base_url: String,
+    spec_id: String
+) -> Result<String, String> {
+    println!("🔗 Creating API node from endpoint");
+    println!("  Endpoint: {:?}", endpoint.get("path"));
+    println!("  Method: {:?}", endpoint.get("method"));
+    println!("  Base URL: {}", base_url);
+    println!("  Spec ID: {}", spec_id);
+    
+    // 임시로 노드 ID 생성 (실제로는 DAG 시스템과 연동 필요)
+    let node_id = format!("api_node_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..8].to_string());
+    
+    println!("✅ Created API node: {}", node_id);
+    Ok(node_id)
+}

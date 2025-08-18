@@ -28,9 +28,14 @@ import type {
   NodeType, 
   FileSystemItem,
   ProjectFormData,
-  FileCreationMode
+  FileCreationMode,
+  ApiNodeData,
+  SwaggerSpec,
+  SwaggerFormData,
+  SwaggerEndpoint
 } from './types';
 import { PROJECT_TYPES } from './types';
+import { ApiNodeCreator } from './ApiNodeCreator';
 
 interface ProjectManagementSectionProps {
   projects: Project[];
@@ -460,6 +465,7 @@ export const MenuSidebar: React.FC<MenuSidebarProps> = ({
 }) => {
   const menuItems = [
     { id: 'projects' as MenuSection, label: '프로젝트 관리', icon: FolderOpen },
+    { id: 'swagger-management' as MenuSection, label: 'Swagger 관리', icon: Globe },
     { id: 'node-creation' as MenuSection, label: '노드 생성', icon: PlusSquare },
     { id: 'general' as MenuSection, label: '일반', icon: Settings },
     { id: 'appearance' as MenuSection, label: '모양', icon: Palette },
@@ -664,6 +670,7 @@ interface NodeCreationFormProps {
   onFileSelect: (filePath: string) => void;
   onFileCreationModeChange: (mode: FileCreationMode) => void;
   onCreateFileNode: () => void;
+  onCreateApiNode?: (apiData: ApiNodeData) => void;
 }
 
 export const NodeCreationForm: React.FC<NodeCreationFormProps> = ({
@@ -675,10 +682,51 @@ export const NodeCreationForm: React.FC<NodeCreationFormProps> = ({
   onProjectChange,
   onFileSelect,
   onFileCreationModeChange,
-  onCreateFileNode
+  onCreateFileNode,
+  onCreateApiNode
 }) => {
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
+  // API 탭 처리
+  if (activeTab === 'api') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h4 className="text-sm font-medium mb-3">API 노드 생성</h4>
+          <p className="text-sm text-gray-600 mb-4">
+            REST API 요청을 위한 노드를 생성합니다. PostMan과 같은 스타일로 설정할 수 있습니다.
+          </p>
+          
+          <ApiNodeCreator
+            onCreateNode={(apiData) => {
+              if (onCreateApiNode) {
+                onCreateApiNode(apiData);
+              }
+            }}
+            onCancel={() => {
+              // 필요시 취소 로직 추가
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // DB 탭 처리
+  if (activeTab === 'db') {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <Database className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h4 className="text-lg font-medium text-gray-900 mb-2">DB 노드 생성</h4>
+          <p className="text-gray-600 mb-4">데이터베이스 연결 노드 생성 기능이 곧 추가될 예정입니다.</p>
+          <Badge variant="outline">Coming Soon</Badge>
+        </div>
+      </div>
+    );
+  }
+
+  // 파일 탭 처리 (기존 코드)
   if (activeTab !== 'file') {
     return null;
   }
@@ -801,4 +849,246 @@ export const NodeCreationForm: React.FC<NodeCreationFormProps> = ({
       </div>
     </div>
   );
+};
+
+interface SwaggerManagementSectionProps {
+  swaggerSpecs: SwaggerSpec[];
+  editingSwagger: SwaggerSpec | null;
+  isAddingNewSwagger: boolean;
+  swaggerFormData: SwaggerFormData;
+  onEdit: (swagger: SwaggerSpec) => void;
+  onDelete: (swaggerId: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onAddNew: () => void;
+  onFileSelect: () => void;
+  onFormDataChange: (field: keyof SwaggerFormData, value: string) => void;
+  onCreateApiNodeFromEndpoint: (endpoint: SwaggerEndpoint, spec: SwaggerSpec) => void;
+}
+
+export const SwaggerManagementSection: React.FC<SwaggerManagementSectionProps> = ({
+  swaggerSpecs,
+  editingSwagger,
+  isAddingNewSwagger,
+  swaggerFormData,
+  onEdit,
+  onDelete,
+  onSave,
+  onCancel,
+  onAddNew,
+  onFileSelect,
+  onFormDataChange,
+  onCreateApiNodeFromEndpoint
+}) => {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium">Swagger/OpenAPI 관리</h3>
+        <Button variant="outline" size="sm" onClick={onAddNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          Swagger 추가
+        </Button>
+      </div>
+
+      {/* Swagger 스펙 목록 */}
+      <div className="space-y-3">
+        {swaggerSpecs.map((swagger) => (
+          <div key={swagger.id} className="border rounded-lg p-4">
+            {editingSwagger?.id === swagger.id ? (
+              // 편집 모드
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">스펙 이름</label>
+                  <Input
+                    value={swaggerFormData.name}
+                    onChange={(e) => onFormDataChange('name', e.target.value)}
+                    placeholder="Swagger 스펙 이름"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">설명</label>
+                  <Input
+                    value={swaggerFormData.description}
+                    onChange={(e) => onFormDataChange('description', e.target.value)}
+                    placeholder="스펙 설명 (선택사항)"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">파일 경로</label>
+                  <div className="flex space-x-2">
+                    <Input
+                      value={swaggerFormData.filePath}
+                      onChange={(e) => onFormDataChange('filePath', e.target.value)}
+                      placeholder="Swagger 파일 경로"
+                      className="flex-1"
+                    />
+                    <Button variant="outline" onClick={onFileSelect}>
+                      <FolderOpen className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <Button onClick={onSave} size="sm">저장</Button>
+                  <Button variant="outline" onClick={onCancel} size="sm">취소</Button>
+                </div>
+              </div>
+            ) : (
+              // 보기 모드
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <h4 className="font-medium">{swagger.name}</h4>
+                    <Badge 
+                      variant={swagger.isValid ? "default" : "destructive"}
+                      className="text-xs"
+                    >
+                      {swagger.isValid ? "유효" : "오류"}
+                    </Badge>
+                    {swagger.version && (
+                      <Badge variant="outline" className="text-xs">
+                        v{swagger.version}
+                      </Badge>
+                    )}
+                  </div>
+                  {swagger.description && (
+                    <p className="text-sm text-gray-600 mb-2">{swagger.description}</p>
+                  )}
+                  {swagger.baseUrl && (
+                    <p className="text-xs text-blue-600 mb-2">{swagger.baseUrl}</p>
+                  )}
+                  <div className="text-xs text-gray-500">
+                    파일: {swagger.filePath}
+                  </div>
+                  {swagger.endpoints && swagger.endpoints.length > 0 && (
+                    <div className="mt-3">
+                      <details className="border rounded bg-gray-50">
+                        <summary className="p-2 cursor-pointer text-sm font-medium">
+                          엔드포인트 {swagger.endpoints.length}개
+                        </summary>
+                        <div className="p-2 space-y-1 max-h-40 overflow-y-auto">
+                          {swagger.endpoints.map((endpoint) => (
+                            <div key={endpoint.id} className="flex items-center justify-between text-xs border-b pb-1">
+                              <div className="flex items-center space-x-2">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${getMethodColor(endpoint.method)}`}
+                                >
+                                  {endpoint.method.toUpperCase()}
+                                </Badge>
+                                <span className="font-mono">{endpoint.path}</span>
+                                {endpoint.summary && (
+                                  <span className="text-gray-600">- {endpoint.summary}</span>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => onCreateApiNodeFromEndpoint(endpoint, swagger)}
+                                title="API 노드 생성"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </div>
+                <div className="flex space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit(swagger)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDelete(swagger.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {swaggerSpecs.length === 0 && !isAddingNewSwagger && (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h4 className="text-lg font-medium text-gray-900 mb-2">Swagger 스펙이 없습니다</h4>
+            <p className="text-gray-600 mb-4">Swagger/OpenAPI 파일을 추가하여 API 엔드포인트를 관리하세요.</p>
+            <Button onClick={onAddNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              첫 번째 Swagger 추가
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* 새 Swagger 추가 폼 */}
+      {isAddingNewSwagger && (
+        <div className="border rounded-lg p-4 bg-gray-50">
+          <h4 className="font-medium mb-3">새 Swagger 스펙 추가</h4>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">스펙 이름</label>
+              <Input
+                value={swaggerFormData.name}
+                onChange={(e) => onFormDataChange('name', e.target.value)}
+                placeholder="Swagger 스펙 이름"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">설명</label>
+              <Input
+                value={swaggerFormData.description}
+                onChange={(e) => onFormDataChange('description', e.target.value)}
+                placeholder="스펙 설명 (선택사항)"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">파일 경로</label>
+              <div className="flex space-x-2">
+                <Input
+                  value={swaggerFormData.filePath}
+                  onChange={(e) => onFormDataChange('filePath', e.target.value)}
+                  placeholder="Swagger/OpenAPI 파일 경로"
+                  className="flex-1"
+                />
+                <Button variant="outline" onClick={onFileSelect}>
+                  <FolderOpen className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                지원 형식: JSON (.json), YAML (.yaml, .yml)
+              </p>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={onSave}>추가</Button>
+              <Button variant="outline" onClick={onCancel}>취소</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// HTTP 메소드별 색상 반환
+const getMethodColor = (method: string): string => {
+  switch (method.toLowerCase()) {
+    case 'get': return 'text-green-600 border-green-600';
+    case 'post': return 'text-blue-600 border-blue-600';
+    case 'put': return 'text-orange-600 border-orange-600';
+    case 'delete': return 'text-red-600 border-red-600';
+    case 'patch': return 'text-purple-600 border-purple-600';
+    case 'head': return 'text-gray-600 border-gray-600';
+    case 'options': return 'text-yellow-600 border-yellow-600';
+    default: return 'text-gray-600 border-gray-600';
+  }
 };

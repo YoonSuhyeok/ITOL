@@ -20,6 +20,28 @@ pub fn get_sqlite_path() -> String {
     sqlite_path
 }
 
+pub fn get_config_dir() -> Result<String, Box<dyn std::error::Error>> {
+    // 앱 설정 디렉터리 가져오기 (Windows에서는 %APPDATA%, Linux에서는 ~/.config, macOS에서는 ~/Library/Application Support)
+    let config_dir = dirs::config_dir()
+        .ok_or("Failed to find config directory")?;
+    
+    // 앱 이름을 사용하여 서브디렉터리 생성
+    let app_name = "TTOL";
+    let app_config_dir = config_dir.join(app_name);
+    
+    // 디렉토리가 존재하지 않으면 생성
+    if !app_config_dir.exists() {
+        std::fs::create_dir_all(&app_config_dir)?;
+    }
+    
+    let config_path = app_config_dir
+        .to_str()
+        .ok_or("Failed to convert path to string")?
+        .to_string();
+    
+    Ok(config_path)
+}
+
 pub static DB_POOL: OnceCell<Arc<Pool<Sqlite>>> = OnceCell::const_new();
 
 /// DB_POOL을 초기화하거나 이미 초기화된 풀을 반환
