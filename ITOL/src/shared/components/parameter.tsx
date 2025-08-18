@@ -2,7 +2,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@radix-ui/react-popover
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Check, ChevronDown, ChevronRight, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronsUpDown, X, Link, Unlink, GitBranch } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command";
 import { Input } from "./ui/input";
 
@@ -11,6 +11,7 @@ import { RequestBody, RequestProperty} from "../types/request-type";
 import { cn } from "../lib/utils";
 import { Checkbox } from "./ui/checkbox";
 import { DagServiceInstance } from "@/features/dag/services/dag.service";
+import { getAvailableNodeReferencesExtended } from "@/features/dag/utils/node-reference.utils";
 
 // 키 선택 처리
 function handleKeySelect(
@@ -129,23 +130,75 @@ function handleValueSelect(
     setOpenPopover(null);
 }
 
-function handleValueSourceChange(paramId: string, source: "manual" | "linked", setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>) {
-    // setParameters((prev) =>
-    //   prev.map((param) =>
-    //     param.id === paramId
-    //       ? {
-    //           ...param,
-    //           valueSource: source,
-    //           // 직접 입력 모드로 변경 시 연결 정보 초기화
-    //           ...(source === "manual"
-    //             ? { sourceNodeId: undefined, sourceNodeLabel: undefined, sourcePath: undefined }
-    //             : {}),
-    //         }
-    //       : param,
-    //   ),
-    // )
+// 노드 참조 선택 처리 (새로운 기능)
+function handleNodeReferenceSelect(
+  paramId: string,
+  referenceNodeId: string,
+  referencePath: string,
+  displayReference: string,
+  setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>,
+  setOpenPopover: React.Dispatch<React.SetStateAction<string | null>>
+) {
+  setParameters((prev) =>
+    prev.map((param) =>
+      param.id === paramId
+        ? {
+            ...param,
+            value: null, // 실제 값은 실행 시 해석됨
+            valueSource: "reference" as const,
+            referenceNodeId,
+            referencePath,
+            displayReference,
+            checked: true,
+          }
+        : param,
+    )
+  );
+
+  // 팝오버 닫기
+  setOpenPopover(null);
 }
-  // 파라미터 삭제 함수
+
+// 값 소스 변경 처리 (확장)
+function handleValueSourceChange(
+  paramId: string, 
+  source: "linked" | "dynamic" | "reference", 
+  setParameters: React.Dispatch<React.SetStateAction<Parameter[]>>
+) {
+  setParameters((prev) =>
+    prev.map((param) =>
+      param.id === paramId
+        ? {
+            ...param,
+            valueSource: source,
+            // 소스 변경 시 관련 필드 초기화
+            ...(source === "dynamic" 
+              ? { 
+                  sourceNodeId: "", 
+                  sourceNodeLabel: "", 
+                  referenceNodeId: undefined,
+                  referencePath: undefined,
+                  displayReference: undefined
+                }
+              : source === "linked"
+              ? {
+                  referenceNodeId: undefined,
+                  referencePath: undefined,
+                  displayReference: undefined
+                }
+              : {
+                  sourceNodeId: "",
+                  sourceNodeLabel: "",
+                  value: null
+                }
+            )
+          }
+        : param,
+    )
+  );
+}
+
+// 파라미터 삭제 함수
 function deleteParameter(
   id: string, 
   parameters: Parameter[], 
@@ -427,104 +480,18 @@ const ParameterForm = ({
                       </Popover>
                   </div>
                   <div className="p-2">
-                    { getAvailableValues(param.id).length === 0 ? 
-                      <Input 
-                        placeholder="직접 값 입력..."
-                        disabled={param.key === null}
-                        value={param.value || ''}
-                        onChange={(e) => {
-                          setParameters(prev => {
-                            const updatedParams = prev.map(p =>
-                              p.id === param.id
-                                ? { ...p, value: e.target.value, valueSource: "dynamic" as const }
-                                : p
-                            );
-                            // DagService에도 즉시 저장
-                            DagServiceInstance.setNodeParameters(nodeId, updatedParams);
-                            return updatedParams;
-                          });
-                        }}
-                      />
-                    : 
-                    <Popover
-                        open={openValuePopover === param.id}
-                        onOpenChange={(open) => handleValuePopoverOpenChange(param.id, open)}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between">
-                            <div className="flex items-center">
-                              {param.value || "Select value..."}
-                            </div>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0 border border-black rounded">
-                          <Command>
-                            <CommandInput placeholder="Search key..." />
-                            <CommandList>
-                              <CommandEmpty>
-                                <Input></Input>
-                              </CommandEmpty>
-                              <CommandGroup>
-                                {getAvailableValues(param.id).map((prop, index) => (
-                                    <CommandItem
-                                      key={`value-${param.id}-${prop.key || 'no-key'}-${index}`}
-                                      value={prop.key || ''}
-                                      onSelect={() => handleValueSelect(param.id, prop.key, (prop as any).sourceNodeId, (prop as any).nodeName, setParameters, setOpenValuePopover)}
-                                    >
-                                      <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center">
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              param.value === prop.key ? "opacity-100" : "opacity-0",
-                                            )}
-                                          />
-                                          {prop.key}
-                                          {(prop as any).description && (
-                                            <span className="ml-2 text-xs text-muted-foreground">
-                                              {(prop as any).nodeName ? `(${(prop as any).nodeName}) ` : ""}
-                                              {(prop as any).description}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <Badge variant="outline" className="text-xs">
-                                          {prop.type}
-                                        </Badge>
-                                      </div>
-                                    </CommandItem>
-                                ))}
-                                {getAvailableValues(param.id).length === 0 && (
-                                  <CommandItem disabled>
-                                    <span className="text-gray-500">모든 값이 이미 선택됨</span>
-                                  </CommandItem>
-                                )}
-                              </CommandGroup>
-                              <div className="p-2 border-t">
-                                <Input
-                                  placeholder="사용자 정의 값 입력..."
-                                  value={customValueInput[param.id] || ''}
-                                  onChange={(e) => setCustomValueInput(prev => ({ ...prev, [param.id]: e.target.value }))}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleCustomValueAdd(param.id, customValueInput[param.id] || '');
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  size="sm"
-                                  className="mt-1 w-full"
-                                  onClick={() => handleCustomValueAdd(param.id, customValueInput[param.id] || '')}
-                                  disabled={!customValueInput[param.id]?.trim()}
-                                >
-                                  추가
-                                </Button>
-                              </div>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    }
+                    <ValueSelector 
+                      param={param}
+                      nodeId={nodeId}
+                      availableValues={getAvailableValues(param.id)}
+                      onParameterUpdate={(updatedParam) => {
+                        setParameters(prev => {
+                          const updatedParams = prev.map(p => p.id === param.id ? updatedParam : p);
+                          DagServiceInstance.setNodeParameters(nodeId, updatedParams);
+                          return updatedParams;
+                        });
+                      }}
+                    />
                   </div>
                   <div className="flex items-center justify-center">
                     <Button
@@ -543,5 +510,228 @@ const ParameterForm = ({
         </div>
     );
 }
+
+// ValueSelector 컴포넌트 - 3가지 값 입력 모드 지원
+const ValueSelector = ({ 
+  param, 
+  nodeId,
+  availableValues,
+  onParameterUpdate 
+}: {
+  param: Parameter;
+  nodeId: string;
+  availableValues: any[];
+  onParameterUpdate: (updatedParam: Parameter) => void;
+}) => {
+  const [valueMode, setValueMode] = useState<"linked" | "dynamic" | "reference">(
+    param.valueSource as "linked" | "dynamic" | "reference" || "dynamic"
+  );
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [availableReferences, setAvailableReferences] = useState<any[]>([]);
+
+  // 사용 가능한 노드 참조 목록 가져오기
+  useEffect(() => {
+    console.log(`[ValueSelector] Getting references for node ${nodeId}`);
+    const references = getAvailableNodeReferencesExtended(nodeId, 
+      DagServiceInstance.getNodeData(), 
+      DagServiceInstance.getEdgeData(),
+      true // 모든 성공한 노드 포함
+    );
+    console.log(`[ValueSelector] Got references:`, references);
+    setAvailableReferences(references);
+  }, [nodeId]);
+
+  // 모드 변경 핸들러
+  const handleModeChange = (newMode: "linked" | "dynamic" | "reference") => {
+    const updatedParam = {
+      ...param,
+      valueSource: newMode,
+      value: newMode === "reference" ? null : param.value,
+      referenceNodeId: newMode === "reference" ? param.referenceNodeId : undefined,
+      referencePath: newMode === "reference" ? param.referencePath : undefined,
+      displayReference: newMode === "reference" ? param.displayReference : undefined,
+    };
+    
+    setValueMode(newMode);
+    onParameterUpdate(updatedParam);
+    setShowModeSelector(false);
+  };
+
+  // 노드 참조 선택 핸들러
+  const handleReferenceSelect = (referenceKey: string) => {
+    const [referenceNodeId, referencePath] = referenceKey.split(':');
+    const reference = availableReferences.find(
+      ref => ref.nodeId === referenceNodeId && ref.field === referencePath
+    );
+    
+    if (reference) {
+      const updatedParam = {
+        ...param,
+        valueSource: "reference" as const,
+        value: null,
+        referenceNodeId,
+        referencePath,
+        displayReference: reference.displayPath,
+      };
+      onParameterUpdate(updatedParam);
+    }
+  };
+
+  const renderModeIcon = () => {
+    switch (valueMode) {
+      case "linked": return <GitBranch className="h-3 w-3" />;
+      case "reference": return <Link className="h-3 w-3" />;
+      default: return <Unlink className="h-3 w-3" />;
+    }
+  };
+
+  const renderModeLabel = () => {
+    switch (valueMode) {
+      case "linked": return "이전 노드 키";
+      case "reference": return "노드 결과 참조";
+      default: return "직접 입력";
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* 모드 선택 버튼 */}
+      <div className="flex items-center justify-between">
+        <Badge variant="outline" className="text-xs">
+          {renderModeIcon()}
+          <span className="ml-1">{renderModeLabel()}</span>
+        </Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowModeSelector(!showModeSelector)}
+          className="h-6 px-2 text-xs"
+        >
+          <ChevronsUpDown className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* 모드 선택 드롭다운 */}
+      {showModeSelector && (
+        <div className="p-2 border rounded bg-white shadow-sm space-y-1">
+          <Button
+            variant={valueMode === "dynamic" ? "default" : "ghost"}
+            size="sm"
+            className="w-full justify-start text-xs"
+            onClick={() => handleModeChange("dynamic")}
+          >
+            <Unlink className="h-3 w-3 mr-2" />
+            직접 입력
+          </Button>
+          {availableValues.length > 0 && (
+            <Button
+              variant={valueMode === "linked" ? "default" : "ghost"}
+              size="sm"
+              className="w-full justify-start text-xs"
+              onClick={() => handleModeChange("linked")}
+            >
+              <GitBranch className="h-3 w-3 mr-2" />
+              이전 노드 키
+            </Button>
+          )}
+          {availableReferences.length > 0 && (
+            <Button
+              variant={valueMode === "reference" ? "default" : "ghost"}
+              size="sm"
+              className="w-full justify-start text-xs"
+              onClick={() => handleModeChange("reference")}
+            >
+              <Link className="h-3 w-3 mr-2" />
+              노드 결과 참조
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* 값 입력 UI */}
+      {valueMode === "dynamic" && (
+        <Input
+          placeholder="직접 값 입력..."
+          disabled={param.key === null}
+          value={param.value || ''}
+          onChange={(e) => {
+            const updatedParam = {
+              ...param,
+              value: e.target.value,
+              valueSource: "dynamic" as const
+            };
+            onParameterUpdate(updatedParam);
+          }}
+        />
+      )}
+
+      {valueMode === "linked" && availableValues.length > 0 && (
+        <select
+          value={param.value || ''}
+          onChange={(e) => {
+            const selectedValue = availableValues.find(v => v.key === e.target.value);
+            if (selectedValue) {
+              const updatedParam = {
+                ...param,
+                value: e.target.value,
+                valueSource: "linked" as const,
+                sourceNodeId: (selectedValue as any).sourceNodeId || "",
+                sourceNodeLabel: (selectedValue as any).nodeName || "",
+              };
+              onParameterUpdate(updatedParam);
+            }
+          }}
+          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={param.key === null}
+        >
+          <option value="">이전 노드 키 선택...</option>
+          {availableValues.map((val, index) => (
+            <option key={`${val.key}-${index}`} value={val.key}>
+              {val.key} {(val as any).nodeName && `(${(val as any).nodeName})`}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {valueMode === "reference" && availableReferences.length > 0 && (
+        <div className="space-y-2">
+          <select
+            value={param.referenceNodeId && param.referencePath ? `${param.referenceNodeId}:${param.referencePath}` : ''}
+            onChange={(e) => handleReferenceSelect(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={param.key === null}
+          >
+            <option value="">노드 결과 참조 선택...</option>
+            {availableReferences.map((ref) => (
+              <option key={`${ref.nodeId}:${ref.field}`} value={`${ref.nodeId}:${ref.field}`}>
+                {ref.displayPath}
+              </option>
+            ))}
+          </select>
+          
+          {param.displayReference && (
+            <div className="p-2 bg-blue-50 rounded border text-xs">
+              <div className="font-medium text-blue-800">현재 참조:</div>
+              <div className="text-blue-600">{param.displayReference}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 참조 불가능한 상태 메시지 */}
+      {valueMode === "linked" && availableValues.length === 0 && (
+        <div className="p-2 bg-gray-50 rounded border text-xs text-gray-600">
+          사용 가능한 이전 노드 키가 없습니다.
+        </div>
+      )}
+
+      {valueMode === "reference" && availableReferences.length === 0 && (
+        <div className="p-2 bg-gray-50 rounded border text-xs text-gray-600">
+          참조 가능한 노드 결과가 없습니다. 먼저 이전 노드를 실행하세요.
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ParameterForm;

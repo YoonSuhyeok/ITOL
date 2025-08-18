@@ -4,6 +4,8 @@ import Parameter from "@/shared/types/node-parameter-type";
 import { Edge, MarkerType, Node } from "@xyflow/react";
 import { invoke } from '@tauri-apps/api/core';
 import { projectManager } from "@/shared/services/project-manager.service";
+import { ParameterWithReference, NodeReference } from "../types/node-connection.types";
+import { resolveAllParameters, getAvailableNodeReferences, getAvailableNodeReferencesExtended } from "../utils/node-reference.utils";
 
 /**
  * DagService is a singleton service that manages the Directed Acyclic Graph (DAG) data.
@@ -207,14 +209,9 @@ class DagService {
         );
         const projectPath = currentProject?.path || "";
 
-        // 노드의 파라미터들을 JSON으로 변환
-        const nodeParameters = this.getNodeParameters(nodeId);
-        const paramJson = JSON.stringify(nodeParameters.reduce((acc, param) => {
-          if (param.key) {
-            acc[param.key] = param.value || "";
-          }
-          return acc;
-        }, {} as Record<string, any>));
+        // 노드의 파라미터들을 JSON으로 변환 (참조 해석 포함)
+        const resolvedParameters = this.resolveNodeParameters(nodeId);
+        const paramJson = JSON.stringify(resolvedParameters);
 
         // 실제 Tauri 명령어 실행
         let result: string;
@@ -402,6 +399,8 @@ class DagService {
       return;
     }
     
+    console.log(`[setNodeParameters] Setting parameters for node ${nodeId}:`, parameters);
+    
     // Parameter[]를 RequestProperty[]로 변환
     const requestProperties = parameters
       .filter(param => param.key && param.checked) // 체크되고 키가 있는 파라미터만
@@ -410,13 +409,101 @@ class DagService {
         key: param.key!,
         type: param.type,
         value: param.value,
-        description: `Parameter from ${param.valueSource} source`
+        description: `Parameter from ${param.valueSource} source`,
+        // 중요: 참조 필드들도 포함해야 함!
+        referenceNodeId: param.referenceNodeId,
+        referencePath: param.referencePath,
+        displayReference: param.displayReference
       }));
     
     // 노드의 requestProperties 업데이트
     node.data.requestProperties = requestProperties;
     
-    console.log(`Parameters updated for node ${nodeId}:`, requestProperties);
+    console.log(`[setNodeParameters] Updated request properties for node ${nodeId}:`, requestProperties);
+  }
+
+  /**
+   * 특정 노드에서 사용 가능한 이전 노드들의 참조 목록을 가져옵니다.
+   */
+  public getAvailableReferences(nodeId: string): NodeReference[] {
+    return getAvailableNodeReferences(nodeId, this.graphNodeData, this.graphEdgeData);
+  }
+
+  /**
+   * 특정 노드에서 사용 가능한 이전 노드들의 참조 목록을 가져옵니다 (확장된 버전).
+   * 직접 연결된 노드가 없을 경우 모든 성공한 노드를 포함합니다.
+   */
+  public getAvailableReferencesExtended(nodeId: string, includeAllSuccessful: boolean = true): NodeReference[] {
+    return getAvailableNodeReferencesExtended(nodeId, this.graphNodeData, this.graphEdgeData, includeAllSuccessful);
+  }
+
+  /**
+   * 노드의 파라미터들을 실제 값으로 해석하여 실행 준비를 합니다.
+   */
+  public resolveNodeParameters(nodeId: string): Record<string, any> {
+    const node = this.graphNodeData.find(n => n.id === nodeId);
+    if (!node) {
+      console.error(`Node with id ${nodeId} not found.`);
+      return {};
+    }
+
+    console.log(`[resolveNodeParameters] Resolving parameters for node ${nodeId}`);
+    console.log(`[resolveNodeParameters] Node data:`, node.data);
+    console.log(`[resolveNodeParameters] Request properties:`, node.data.requestProperties);
+
+    // 노드의 파라미터들을 ParameterWithReference 형태로 변환
+    const parametersWithRef: ParameterWithReference[] = node.data.requestProperties.map((param, index) => ({
+      id: `${nodeId}-param-${index}`,
+      key: param.key,
+      value: param.value,
+      type: param.type as any,
+      valueSource: param.referenceNodeId ? 'reference' : 'manual',
+      referenceNodeId: param.referenceNodeId,
+      referencePath: param.referencePath,
+      displayReference: param.displayReference
+    }));
+
+    console.log(`[resolveNodeParameters] Parameters with reference:`, parametersWithRef);
+
+    // 참조를 실제 값으로 해석
+    const resolvedParams = resolveAllParameters(parametersWithRef);
+    console.log(`[resolveNodeParameters] Resolved parameters:`, resolvedParams);
+    
+    return resolvedParams;
+  }
+
+  /**
+   * 노드 파라미터에 다른 노드 결과 참조를 설정합니다.
+   */
+  public setParameterReference(
+    nodeId: string, 
+    parameterKey: string, 
+    referenceNodeId: string, 
+    referencePath: string
+  ): void {
+    const node = this.graphNodeData.find(n => n.id === nodeId);
+    if (!node) {
+      console.error(`Node with id ${nodeId} not found.`);
+      return;
+    }
+
+    const param = node.data.requestProperties.find(p => p.key === parameterKey);
+    if (!param) {
+      console.error(`Parameter with key ${parameterKey} not found in node ${nodeId}.`);
+      return;
+    }
+
+    // 참조 정보 설정
+    param.referenceNodeId = referenceNodeId;
+    param.referencePath = referencePath;
+    
+    // 참조된 노드 정보 가져오기
+    const referencedNode = this.graphNodeData.find(n => n.id === referenceNodeId);
+    if (referencedNode) {
+      param.displayReference = `${referencedNode.data.fileName} → ${referencePath}`;
+    }
+
+    console.log(`Parameter reference set: ${nodeId}.${parameterKey} → ${referenceNodeId}.${referencePath}`);
   }
 
 }

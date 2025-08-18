@@ -4,9 +4,9 @@ interface sumRequestType {
     targets: string;
 }
 
-function sum(targets: sumRequestType): number {
+function sum(targets: sumRequestType): string {
 
-    return 4;
+    return targets.targets;
 }
 
 const startFunction = createStartPoint(sum);
