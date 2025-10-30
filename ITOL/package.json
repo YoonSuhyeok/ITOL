@@ -10,7 +10,10 @@
 		"tauri": "tauri",
 		"lint": "biome check",
 		"lint:fix": "biome check --fix",
-		"format": "biome format"
+		"format": "biome format",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui",
+		"test:e2e:debug": "playwright test --debug"
 	},
 	"dependencies": {
 		"@microlink/react-json-view": "^1.26.2",
@@ -40,6 +43,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
+		"@playwright/test": "^1.56.1",
 		"@tauri-apps/cli": "^2",
 		"@types/node": "^24.0.1",
 		"@types/react": "^18.3.1",
