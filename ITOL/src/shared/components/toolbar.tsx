@@ -2,12 +2,14 @@ import { Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import SettingsModal from "./settings-modal";
+import type { ApiNodeData } from "@/entities/language/model/api-node-type";
 
 interface ToolbarProps {
   onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
+  onCreateApiNode: (apiData: ApiNodeData) => string;
 }
 
-const Toolbar = ({ onCreateFileNode }: ToolbarProps) => {
+const Toolbar = ({ onCreateFileNode, onCreateApiNode }: ToolbarProps) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleSettingsClick = () => {
@@ -38,6 +40,7 @@ const Toolbar = ({ onCreateFileNode }: ToolbarProps) => {
         isOpen={isSettingsOpen} 
         onClose={handleCloseSettings}
         onCreateFileNode={onCreateFileNode}
+        onCreateApiNode={onCreateApiNode}
       />
     </>
   );

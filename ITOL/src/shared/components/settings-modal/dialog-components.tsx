@@ -29,11 +29,11 @@ import type {
   FileSystemItem,
   ProjectFormData,
   FileCreationMode,
-  ApiNodeData,
   SwaggerSpec,
   SwaggerFormData,
   SwaggerEndpoint
 } from './types';
+import type { ApiNodeData } from '@/entities/language/model/api-node-type';
 import { PROJECT_TYPES } from './types';
 import { ApiNodeCreator } from './ApiNodeCreator';
 

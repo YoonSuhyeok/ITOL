@@ -2,6 +2,7 @@ export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
+  onCreateApiNode: (apiData: import('@/entities/language/model/api-node-type').ApiNodeData) => string;
 }
 
 export interface Project {

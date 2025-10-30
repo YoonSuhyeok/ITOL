@@ -5,6 +5,7 @@ import "@xyflow/react/dist/style.css";
 import "./App.css";
 import { DagServiceInstance } from "./features/dag/services/dag.service";
 import FileNode from "@/entities/language/ui/file-node";
+import ApiNode from "@/entities/language/ui/api-node";
 import { useCallback, useMemo } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
 import WindowHeader from "./shared/components/window-header";
@@ -99,9 +100,29 @@ function FlowCanvas() {
 		return newNodeId;
 	}, [setNodes]);
 
+	// API 노드 생성 함수 (설정 모달에서 사용)
+	const createApiNode = useCallback((apiData: import('@/entities/language/model/api-node-type').ApiNodeData) => {
+		const newNodeId = `api-node-${Date.now()}`;
+		
+		const newNode = {
+			id: newNodeId,
+			type: 'apiNode',
+			position: { x: Math.random() * 400, y: Math.random() * 400 }, // 랜덤 위치
+			data: apiData
+		};
+		
+		setNodes((nds) => [...nds, newNode as any]);
+		
+		// DagService에도 동기화
+		DagServiceInstance.addNode(newNode as any);
+		
+		return newNodeId;
+	}, [setNodes]);
+
 	const nodeTypes = useMemo(
 		() => ({
-			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
+			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />,
+			apiNode: (nodeProps: any) => <ApiNode {...nodeProps} />
 		}),
 		[setNodes, setEdges]
 	);
@@ -176,7 +197,7 @@ function FlowCanvas() {
 					<Background />
 				</ReactFlow>
 			</div>
-			<Toolbar onCreateFileNode={createFileNode} />
+			<Toolbar onCreateFileNode={createFileNode} onCreateApiNode={createApiNode} />
 		</div>
 	);
 }

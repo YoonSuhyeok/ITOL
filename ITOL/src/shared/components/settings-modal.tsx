@@ -53,7 +53,7 @@ import {
   SwaggerManagementSection
 } from './settings-modal/dialog-components';
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode, onCreateApiNode }) => {
   const [activeSection, setActiveSection] = useState<MenuSection>('projects');
   const [activeNodeTab, setActiveNodeTab] = useState<NodeType>('file');
   const [fileCreationMode, setFileCreationMode] = useState<FileCreationMode>('select-existing');
@@ -337,7 +337,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     }
   }, [selectedProjectId, selectedFileForNode, projects, onCreateFileNode, onClose]);
 
-  const handleCreateApiNode = useCallback((apiData: ApiNodeData) => {
+  const handleCreateApiNode = useCallback((apiData: import('@/entities/language/model/api-node-type').ApiNodeData) => {
     setConfirmDialog({
       isOpen: true,
       title: "API 노드 생성",
@@ -345,15 +345,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       onConfirm: () => {
         console.log('API 노드 생성:', apiData);
         
-        // TODO: API 노드 생성 로직 구현
-        // const nodeId = createApiNode(apiData, onCreateApiNode);
-        // console.log(`API 노드가 생성되었습니다! Node ID: ${nodeId}`);
+        // API 노드 생성
+        const nodeId = onCreateApiNode(apiData);
+        console.log(`API 노드가 생성되었습니다! Node ID: ${nodeId}`);
         
         closeConfirmDialog();
         onClose();
       }
     });
-  }, [onClose]);
+  }, [onClose, onCreateApiNode]);
 
   const closeConfirmDialog = useCallback(() => {
     setConfirmDialog({
