@@ -3,5 +3,58 @@
 	"identifier": "default",
 	"description": "Capability for the main window",
 	"windows": ["main"],
-	"permissions": ["core:default", "opener:default"]
+	"permissions": [
+		"core:default",
+		"opener:default", 
+		"core:window:default",
+		"core:window:allow-start-dragging",
+		"core:window:allow-minimize",
+		"core:window:allow-maximize",
+		"core:window:allow-unmaximize",
+		"core:window:allow-close",
+		"dialog:default",
+		"fs:default",
+		"fs:allow-read-dir",
+		"fs:allow-read-file",
+		"fs:allow-stat",
+		"fs:allow-write-file",
+		"fs:allow-create",
+		"fs:allow-rename",
+		"fs:allow-remove",
+		{
+			"identifier": "fs:scope",
+			"allow": [
+				{
+					"path": "$APPDATA/**"
+				},
+				{
+					"path": "$APPCONFIG/**"
+				},
+				{
+					"path": "$HOME/**"
+				},
+				{
+					"path": "$DOCUMENT/**"
+				},
+				{
+					"path": "$DESKTOP/**"
+				},
+				{
+					"path": "C:\\**"
+				},
+				{
+					"path": "D:\\**"
+				},
+				{
+					"path": "/Users/**"
+				},
+				{
+					"path": "/Users/yoonsu/TTOL/**"
+				},
+				{
+					"path": "/Users/yoonsu/TTOL"
+				}
+			]
+		}
+	]
 }

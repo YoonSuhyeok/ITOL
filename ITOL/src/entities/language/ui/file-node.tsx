@@ -27,8 +27,8 @@ import { DagServiceInstance } from "@/features/dag/services/dag.service";
 import { useNodeStore } from "@/shared/store/use-node-store";
 
 const handleRun = async (nodeId: string) => {
-  DagServiceInstance.initTopologicalSort(); 
-  DagServiceInstance.runNode(nodeId);
+  // 새로운 실행 시작 메서드 사용
+  DagServiceInstance.startExecution(nodeId);
 };
 
 const handleBuild = async () => {
@@ -51,9 +51,10 @@ const handleSave = async () => {
 
 interface FileNodeProps extends NodeProps<Node<FileNodeData>> {
 	setNodes: React.Dispatch<React.SetStateAction<Node<FileNodeData>[]>>;
+	setEdges?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
-function FileNode({ setNodes, ...node }: FileNodeProps) {
+function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 	
   const data = node.data as FileNodeData;
   const {
@@ -238,7 +239,23 @@ function FileNode({ setNodes, ...node }: FileNodeProps) {
 						size="icon"
 						className="h-8 w-8"
 						onClick={() => {
+							// DagService에서 노드 제거 (엣지도 함께 제거됨)
+							DagServiceInstance.removeNode(node.id);
+							
+							// React Flow 상태에서 노드 제거
 							setNodes((nds) => nds.filter((n) => n.id !== node.id));
+							
+							// 엣지도 제거 (해당 노드와 연결된 모든 엣지)
+							if (setEdges) {
+								setEdges((eds) => {
+									const filteredEdges = eds.filter((edge) => 
+										edge.source !== node.id && edge.target !== node.id
+									);
+									return filteredEdges;
+								});
+							}
+							
+							console.log(`Node ${node.id} removed successfully`);
 						}}
 					>
 						<X className="h-4 w-4" />

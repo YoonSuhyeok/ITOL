@@ -7,6 +7,9 @@ import { DagServiceInstance } from "./features/dag/services/dag.service";
 import FileNode from "@/entities/language/ui/file-node";
 import { useCallback, useMemo } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
+import WindowHeader from "./shared/components/window-header";
+import Toolbar from "./shared/components/toolbar";
+import { ExecutionLogPanel } from "./shared/components/execution-log-panel";
 
 export default function App() {
 	return (
@@ -40,24 +43,68 @@ function FlowCanvas() {
 		
 		setNodes((nds) => [...nds, newNode]);
 		
+		// DagService에도 노드 추가
+		DagServiceInstance.addNode(newNode);
+		
 		// 소스 노드가 있으면 자동으로 연결
 		if (sourceNodeId) {
-			setEdges((eds) => addEdge({
-				id: `${sourceNodeId}-${newNodeId}`,
-				source: sourceNodeId,
-				target: newNodeId,
-				markerEnd: { type: MarkerType.ArrowClosed },
-			}, eds));
+			setEdges((eds) => {
+				const newEdges = addEdge({
+					id: `${sourceNodeId}-${newNodeId}`,
+					source: sourceNodeId,
+					target: newNodeId,
+					markerEnd: { type: MarkerType.ArrowClosed },
+				}, eds);
+				
+				// DagService에 엣지 데이터 동기화
+				try {
+					DagServiceInstance.setEdgeData(newEdges);
+					console.log("Auto-connection successful");
+				} catch (error) {
+					console.error("Failed to auto-connect:", error);
+					// 오류 발생 시 엣지 연결 취소
+					return eds;
+				}
+				
+				return newEdges;
+			});
 		}
 		
 		return newNodeId;
 	}, [nodes.length, setNodes, setEdges]);
 
+	// 파일 노드 생성 함수 (설정 모달에서 사용)
+	const createFileNode = useCallback((filePath: string, fileName: string, fileExtension: string) => {
+		const newNodeId = `node-${Date.now()}`;
+		
+		// 파일 확장자를 ts/js로 매핑
+		const mappedExtension = (fileExtension === 'tsx' || fileExtension === 'ts') ? 'ts' : 'js';
+		
+		const newNode = {
+			id: newNodeId,
+			type: 'languageNode',
+			position: { x: Math.random() * 400, y: Math.random() * 400 }, // 랜덤 위치
+			data: {
+				fileName: fileName.split('.')[0], // 확장자 제거
+				fileExtension: mappedExtension as any,
+				filePath: filePath,
+				requestProperties: []
+			}
+		};
+		
+		setNodes((nds) => [...nds, newNode]);
+		
+		// DagService에도 동기화
+		DagServiceInstance.addNode(newNode);
+		
+		return newNodeId;
+	}, [setNodes]);
+
 	const nodeTypes = useMemo(
 		() => ({
-			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} />
+			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
 		}),
-		[setNodes]
+		[setNodes, setEdges]
 	);
 
 	const onConnect = useCallback(
@@ -70,7 +117,17 @@ function FlowCanvas() {
 			  },
 			  oldEdges
 			);
-			DagServiceInstance.setEdgeData(newEdges); // 서비스에 동기화
+			
+			// DagService에 엣지 데이터 동기화
+			try {
+			  DagServiceInstance.setEdgeData(newEdges);
+			  console.log("Edge connection successful:", connection);
+			} catch (error) {
+			  console.error("Failed to add edge:", error);
+			  // 순환 참조 등의 오류가 발생하면 엣지 추가를 취소
+			  return oldEdges;
+			}
+			
 			return newEdges;
 		  });
 		},
@@ -100,18 +157,32 @@ function FlowCanvas() {
 	);
 
 	return (
-		<div style={{ width: "100vw", height: "100vh" }}>
-			<ReactFlow
-				nodeTypes={nodeTypes}
-				nodes={nodes}
-				edges={edges}
-				onNodesChange={onNodesChange}
-				onEdgesChange={onEdgesChange}
-				onConnect={onConnect}
-				onConnectEnd={onConnectEnd}
-			>
-				<Background />
-			</ReactFlow>
+		<div style={{ width: "100vw", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+			<WindowHeader />
+			<div style={{ 
+				width: "100%", 
+				flex: 1,
+				marginTop: "65px",
+				overflow: "hidden",
+				display: "flex",
+				flexDirection: "column"
+			}}>
+				<div style={{ flex: 1, position: "relative" }}>
+					<ReactFlow
+						nodeTypes={nodeTypes}
+						nodes={nodes}
+						edges={edges}
+						onNodesChange={onNodesChange}
+						onEdgesChange={onEdgesChange}
+						onConnect={onConnect}
+						onConnectEnd={onConnectEnd}
+					>
+						<Background />
+					</ReactFlow>
+				</div>
+				<ExecutionLogPanel />
+			</div>
+			<Toolbar onCreateFileNode={createFileNode} />
 		</div>
 	);
 }

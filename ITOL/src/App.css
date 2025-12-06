@@ -3,6 +3,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 전역 스크롤바 방지 */
+html, body {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	width: 100%;
+	height: 100%;
+}
+
+#root {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
 @theme inline {
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
