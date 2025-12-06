@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tauri::Manager;
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+// use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {

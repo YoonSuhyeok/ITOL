@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
+import { invoke } from "@tauri-apps/api/core";
 
 // 분리된 모듈들 import
 import type { 
@@ -271,31 +272,108 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setSelectedFileForNode(filePath);
   }, []);
 
-  const handleCreateFileNode = useCallback(() => {
-    if (selectedProjectId && selectedFileForNode) {
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const fileName = selectedFileForNode.split('/').pop() || selectedFileForNode.split('\\').pop() || '';
-      
-      setConfirmDialog({
-        isOpen: true,
-        title: "FILE 노드 생성",
-        message: `"${fileName}" 파일로 노드를 생성하시겠습니까?\n생성 후 설정 창을 닫습니다.`,
-        onConfirm: () => {
-          console.log('파일 노드 생성:', { 
-            projectId: selectedProjectId, 
-            projectName: selectedProject?.name,
-            filePath: selectedFileForNode 
-          });
-          
-          const nodeId = createFileNode(selectedFileForNode, onCreateFileNode);
-          console.log(`FILE 노드가 생성되었습니다! Node ID: ${nodeId}`);
-          
-          closeConfirmDialog();
-          onClose();
-        }
-      });
+  const handleCreateFileNode = useCallback(async () => {
+    if (!selectedProjectId || !selectedFileForNode) {
+      alert('프로젝트와 파일을 선택해주세요.');
+      return;
     }
-  }, [selectedProjectId, selectedFileForNode, projects, onCreateFileNode, onClose]);
+    
+    const selectedProject = projects.find(p => p.id === selectedProjectId);
+    if (!selectedProject) {
+      alert('선택된 프로젝트를 찾을 수 없습니다.');
+      return;
+    }
+    
+    try {
+      let filePath = selectedFileForNode;
+      let fileName = selectedFileForNode.split('/').pop() || selectedFileForNode.split('\\').pop() || '';
+      let fileExtension = '';
+      
+      // 새 파일 생성 모드인 경우
+      if (fileCreationMode === 'create-new') {
+        // 파일명 검증
+        if (!fileName.trim()) {
+          alert('파일명을 입력해주세요.');
+          return;
+        }
+        
+        // 확장자 확인
+        if (!fileName.endsWith('.ts') && !fileName.endsWith('.js')) {
+          alert('파일명에 .ts 또는 .js 확장자를 포함해주세요.');
+          return;
+        }
+        
+        setConfirmDialog({
+          isOpen: true,
+          title: "새 파일 생성 및 노드 추가",
+          message: `"${fileName}" 파일을 생성하고 노드를 추가하시겠습니까?\n\n파일 경로: ${selectedProject.path}/${fileName}\n\n기본 템플릿이 자동으로 적용됩니다.`,
+          onConfirm: async () => {
+            try {
+              // Tauri 백엔드를 통해 템플릿과 함께 파일 생성
+              const result = await invoke<{
+                file_path: string;
+                file_name: string;
+                file_extension: string;
+                template_applied: boolean;
+              }>('create_file_with_template_command', {
+                newFileName: fileName,
+                path: selectedProject.path
+              });
+              
+              console.log('✅ 파일 생성 완료:', result);
+              
+              // 생성된 파일로 노드 자동 생성
+              const nodeId = createFileNode(
+                result.file_path, 
+                onCreateFileNode
+              );
+              
+              console.log(`✅ 노드 자동 생성 완료! Node ID: ${nodeId}`);
+              
+              if (result.template_applied) {
+                alert(`파일이 생성되고 노드가 추가되었습니다!\n\n파일: ${result.file_path}\n템플릿: 적용됨\n\n생성된 파일을 편집하여 로직을 구현하세요.`);
+              } else {
+                alert(`파일이 생성되고 노드가 추가되었습니다!\n\n파일: ${result.file_path}`);
+              }
+              
+              closeConfirmDialog();
+              onClose();
+              
+            } catch (error) {
+              console.error('❌ 파일 생성 실패:', error);
+              alert(`파일 생성에 실패했습니다.\n\n오류: ${error}`);
+              closeConfirmDialog();
+            }
+          }
+        });
+        
+      } else {
+        // 기존 파일 선택 모드
+        setConfirmDialog({
+          isOpen: true,
+          title: "FILE 노드 생성",
+          message: `"${fileName}" 파일로 노드를 생성하시겠습니까?\n생성 후 설정 창을 닫습니다.`,
+          onConfirm: () => {
+            console.log('파일 노드 생성:', { 
+              projectId: selectedProjectId, 
+              projectName: selectedProject?.name,
+              filePath: selectedFileForNode 
+            });
+            
+            const nodeId = createFileNode(selectedFileForNode, onCreateFileNode);
+            console.log(`FILE 노드가 생성되었습니다! Node ID: ${nodeId}`);
+            
+            closeConfirmDialog();
+            onClose();
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.error('노드 생성 중 오류:', error);
+      alert(`노드 생성 중 오류가 발생했습니다.\n\n${error}`);
+    }
+  }, [selectedProjectId, selectedFileForNode, fileCreationMode, projects, onCreateFileNode, onClose]);
 
   const closeConfirmDialog = useCallback(() => {
     setConfirmDialog({

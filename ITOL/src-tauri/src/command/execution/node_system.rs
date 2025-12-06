@@ -503,7 +503,7 @@ pub async fn execute_playwright(params: ExecuteFileParams) -> Result<String, Str
     // 파라미터 검증 먼저 수행
     validate_execution_params(&params)?;
 
-    let (project_name, page_name, json_path) = prepare_execution_context(&params).await?;
+    let (_project_name, _page_name, json_path) = prepare_execution_context(&params).await?;
     debug!("📁 Context prepared - JSON path: {}", json_path);
     
     let parent_dir = Path::new(&json_path)
@@ -657,7 +657,7 @@ pub async fn execute_ts(params: ExecuteFileParams) -> Result<String, String> {
     // 파라미터 검증 먼저 수행
     validate_execution_params(&params)?;
 
-    let (project_name, page_name, json_path) = prepare_execution_context(&params).await?;
+    let (_project_name, _page_name, json_path) = prepare_execution_context(&params).await?;
     debug!("📁 Context prepared - JSON path: {}", json_path);
     
     // JSON 파일 내용 검증

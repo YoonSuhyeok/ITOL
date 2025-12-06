@@ -52,7 +52,7 @@ pub fn list_items_single_level_command(path: String) -> Result<Vec<std::path::Pa
 
 #[command]
 pub async fn select_folder_dialog() -> Result<String, String> {
-    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+    // use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
     
     // TODO: 실제 폴더 선택 다이얼로그 구현
     // 현재는 임시로 고정된 경로 반환
@@ -114,6 +114,14 @@ pub async fn rename_file_command(file_path: String, new_file_name: String) -> Re
 pub async fn create_file_command(new_file_name: String, path: String) -> Result<String, String> {
     print!("new_file_name: {}, path: {}", new_file_name, path);
     Ok(folder::file::create_file(new_file_name, path).await?)
+}
+
+#[command]
+pub async fn create_file_with_template_command(
+    new_file_name: String, 
+    path: String
+) -> Result<folder::file::CreateFileResult, String> {
+    folder::file::create_file_with_template(new_file_name, path).await
 }
 
 #[command]

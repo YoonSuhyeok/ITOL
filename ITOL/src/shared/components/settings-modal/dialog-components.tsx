@@ -787,13 +787,66 @@ export const NodeCreationForm: React.FC<NodeCreationFormProps> = ({
                 </div>
               )}
               
+              {/* 새 파일 생성 폼 */}
+              {selectedProject && fileCreationMode === 'create-new' && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">새 파일 생성</label>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">파일명</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border rounded-md text-sm"
+                        placeholder="예: processData.ts"
+                        value={selectedFile}
+                        onChange={(e) => onFileSelect(e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        💡 .ts 또는 .js 확장자를 포함하여 입력하세요
+                      </p>
+                    </div>
+                    
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <h4 className="text-sm font-medium text-green-800">자동 템플릿 제공</h4>
+                          <p className="text-xs text-green-700 mt-1">
+                            TypeScript 파일 생성 시 ITOL 워크플로우에 최적화된 기본 템플릿이 자동으로 적용됩니다.
+                          </p>
+                          <ul className="text-xs text-green-600 mt-2 space-y-1">
+                            <li>• 입력/출력 JSON 처리 코드</li>
+                            <li>• 타입 정의 (InputData, OutputData)</li>
+                            <li>• 에러 처리 로직</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {selectedFile && (
+                      <div className="p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                        <div className="font-medium text-blue-800">생성될 파일 경로:</div>
+                        <div className="text-blue-600 font-mono text-xs mt-1 break-all">
+                          {selectedProject.path}/{selectedFile}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <Button 
                 className="w-full"
                 onClick={onCreateFileNode}
-                disabled={!selectedProjectId || (fileCreationMode === 'select-existing' && !selectedFile)}
+                disabled={!selectedProjectId || !selectedFile}
               >
                 <FileText className="h-4 w-4 mr-2" />
-                FILE 노드 생성
+                {fileCreationMode === 'create-new' ? '파일 생성 및 노드 추가' : 'FILE 노드 생성'}
               </Button>
             </div>
           </div>

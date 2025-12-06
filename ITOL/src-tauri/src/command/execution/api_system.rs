@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
-use reqwest::{self, header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, CONTENT_TYPE}};
+use serde::Deserialize;
+use reqwest::{self, header::{HeaderName, HeaderValue, ACCEPT, CONTENT_TYPE}};
 use std::collections::HashMap;
-use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteApiParams {

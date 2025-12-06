@@ -7,7 +7,7 @@ pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
 
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(|_app| {
             // 앱 시작 후 비동기 초기화 실행
             tauri::async_runtime::spawn(async move {
                 command::database::create_sqlite().await;
@@ -24,6 +24,7 @@ pub fn run() {
             command::list_js_files_command,
             command::rename_file_command, 
             command::create_file_command,
+            command::create_file_with_template_command,
             command::list_files_in_path_command,
             command::list_dirs_in_path_command,
             command::list_all_items_in_path_command,
