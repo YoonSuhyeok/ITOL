@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs::{self};
 use std::path::{Path, PathBuf};
 use std::process::{Command};
@@ -11,6 +11,16 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use log::{debug, info, warn, error};
+use tauri::Emitter;
+
+#[derive(Debug, Serialize, Clone)]
+struct ExecutionLogEvent {
+    node_id: String,
+    node_name: String,
+    log_type: String, // "stdout", "stderr", "info", "error", "success"
+    message: String,
+    run_id: String,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteFileParams {

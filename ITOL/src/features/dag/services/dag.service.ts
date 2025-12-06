@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { projectManager } from "@/shared/services/project-manager.service";
 import { ParameterWithReference, NodeReference } from "../types/node-connection.types";
 import { resolveAllParameters, getAvailableNodeReferences, getAvailableNodeReferencesExtended } from "../utils/node-reference.utils";
+import { useLogStore } from "@/shared/store/use-log-store";
 
 /**
  * DagService is a singleton service that manages the Directed Acyclic Graph (DAG) data.
@@ -213,6 +214,17 @@ class DagService {
         const resolvedParameters = this.resolveNodeParameters(nodeId);
         const paramJson = JSON.stringify(resolvedParameters);
 
+        const runId = `run_${Date.now()}`;
+        
+        // 실행 시작 로그
+        useLogStore.getState().addLog({
+          nodeId,
+          nodeName: node.data.fileName,
+          type: 'info',
+          message: `🚀 Starting execution...`,
+          runId
+        });
+
         // 실제 Tauri 명령어 실행
         let result: string;
         if (node.data.fileExtension === 'ts') {
@@ -224,7 +236,7 @@ class DagService {
               project_id: currentProject ? parseInt(currentProject.id) : null,
               page_id: 1, // 페이지 ID는 추후 동적으로 설정
               node_name: node.data.fileName,
-              run_id: `run_${Date.now()}`
+              run_id: runId
             }
           });
         } else if (node.data.fileExtension === 'js') {
@@ -236,7 +248,7 @@ class DagService {
               project_id: currentProject ? parseInt(currentProject.id) : null,
               page_id: 1, // 페이지 ID는 추후 동적으로 설정
               node_name: node.data.fileName,
-              run_id: `run_${Date.now()}`
+              run_id: runId
             }
           });
         } else {
@@ -244,6 +256,26 @@ class DagService {
         }
 
         console.log(`Node ${nodeId} executed successfully.`);
+        
+        // 성공 로그
+        useLogStore.getState().addLog({
+          nodeId,
+          nodeName: node.data.fileName,
+          type: 'success',
+          message: `✅ Execution completed successfully`,
+          runId
+        });
+        
+        // 결과 로그 (최대 200자)
+        const resultPreview = result.length > 200 ? result.substring(0, 200) + '...' : result;
+        useLogStore.getState().addLog({
+          nodeId,
+          nodeName: node.data.fileName,
+          type: 'stdout',
+          message: resultPreview,
+          runId
+        });
+        
         useNodeStore.getState().setNodeResult(nodeId, {
           status: "success",
           result: result,
@@ -260,6 +292,16 @@ class DagService {
         }
       } catch (error) {
         console.error(`Node ${nodeId} execution failed:`, error);
+        
+        // 에러 로그 추가
+        useLogStore.getState().addLog({
+          nodeId,
+          nodeName: node?.data?.fileName || nodeId,
+          type: 'error',
+          message: `❌ Execution failed: ${error}`,
+          runId: `run_${Date.now()}`
+        });
+        
         useNodeStore.getState().setNodeResult(nodeId, {
           status: "error",
           result: `Execution failed: ${error}`,
@@ -267,6 +309,16 @@ class DagService {
       }
     } else {
       console.error(`Node with id ${nodeId} not found.`);
+      
+      // 노드 미발견 로그
+      useLogStore.getState().addLog({
+        nodeId,
+        nodeName: nodeId,
+        type: 'error',
+        message: `❌ Node not found`,
+        runId: `run_${Date.now()}`
+      });
+      
       useNodeStore.getState().setNodeResult(nodeId, {
         status: "error",
         result: `Node ${nodeId} not found`,

@@ -9,6 +9,7 @@ import { useCallback, useMemo } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
 import WindowHeader from "./shared/components/window-header";
 import Toolbar from "./shared/components/toolbar";
+import { ExecutionLogPanel } from "./shared/components/execution-log-panel";
 
 export default function App() {
 	return (
@@ -156,25 +157,30 @@ function FlowCanvas() {
 	);
 
 	return (
-		<div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+		<div style={{ width: "100vw", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
 			<WindowHeader />
 			<div style={{ 
 				width: "100%", 
-				height: "calc(100vh - 113px)", /* 헤더 높이(65px) + 툴바 높이(48px)만큼 빼기 */
+				flex: 1,
 				marginTop: "65px",
-				overflow: "hidden" 
+				overflow: "hidden",
+				display: "flex",
+				flexDirection: "column"
 			}}>
-				<ReactFlow
-					nodeTypes={nodeTypes}
-					nodes={nodes}
-					edges={edges}
-					onNodesChange={onNodesChange}
-					onEdgesChange={onEdgesChange}
-					onConnect={onConnect}
-					onConnectEnd={onConnectEnd}
-				>
-					<Background />
-				</ReactFlow>
+				<div style={{ flex: 1, position: "relative" }}>
+					<ReactFlow
+						nodeTypes={nodeTypes}
+						nodes={nodes}
+						edges={edges}
+						onNodesChange={onNodesChange}
+						onEdgesChange={onEdgesChange}
+						onConnect={onConnect}
+						onConnectEnd={onConnectEnd}
+					>
+						<Background />
+					</ReactFlow>
+				</div>
+				<ExecutionLogPanel />
 			</div>
 			<Toolbar onCreateFileNode={createFileNode} />
 		</div>

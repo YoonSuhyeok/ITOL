@@ -381,3 +381,38 @@ pub struct CreateFileResult {
     pub file_extension: String,
     pub template_applied: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_basic_typescript_template() {
+        let template = generate_basic_typescript_template("test_file.ts");
+        
+        // Check if template contains essential ITOL structures
+        assert!(template.contains("interface InputData"));
+        assert!(template.contains("interface OutputData"));
+        assert!(template.contains("const inputData: InputData = JSON.parse"));
+        assert!(template.contains("const output: OutputData"));
+        assert!(template.contains("fs.writeFileSync(outputPath"));
+        
+        // Check error handling
+        assert!(template.contains("try {"));
+        assert!(template.contains("catch (error)"));
+        
+        // Check file name is embedded
+        assert!(template.contains("test_file"));
+    }
+
+    #[test]
+    fn test_template_has_typescript_syntax() {
+        let template = generate_basic_typescript_template("example.ts");
+        
+        // Verify TypeScript features
+        assert!(template.contains(": string"));
+        assert!(template.contains("interface"));
+        assert!(template.contains("JSON.parse"));
+        assert!(template.contains("async function main()"));
+    }
+}
