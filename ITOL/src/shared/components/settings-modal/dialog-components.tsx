@@ -461,6 +461,7 @@ export const MenuSidebar: React.FC<MenuSidebarProps> = ({
   const menuItems = [
     { id: 'projects' as MenuSection, label: '프로젝트 관리', icon: FolderOpen },
     { id: 'node-creation' as MenuSection, label: '노드 생성', icon: PlusSquare },
+    { id: 'connections' as MenuSection, label: 'DB 커넥션', icon: Database },
     { id: 'general' as MenuSection, label: '일반', icon: Settings },
     { id: 'appearance' as MenuSection, label: '모양', icon: Palette },
     { id: 'editor' as MenuSection, label: '에디터', icon: Edit2 },

@@ -153,6 +153,17 @@ pub async fn execute_api_command(params: execution::api_system::ExecuteApiParams
     execution::api_system::execute_api_request(params).await
 }
 
+// Database Commands
+#[command]
+pub async fn execute_db_command(params: execution::db_system::ExecuteDbParams) -> Result<String, String> {
+    execution::db_system::execute_db_query(params).await
+}
+
+#[command]
+pub async fn test_db_connection_command(params: execution::db_system::TestConnectionParams) -> Result<String, String> {
+    execution::db_system::test_connection(params.connection).await
+}
+
 // Project Manager Commands
 #[command]
 pub async fn add_project_command(

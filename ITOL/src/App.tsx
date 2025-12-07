@@ -6,6 +6,7 @@ import "./App.css";
 import { DagServiceInstance } from "./features/dag/services/dag.service";
 import FileNode from "@/entities/language/ui/file-node";
 import ApiNode from "@/entities/api/ui/api-node";
+import DbNode from "@/entities/db/ui/db-node";
 import { useCallback, useMemo, useState } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
 import WindowHeader from "./shared/components/window-header";
@@ -13,7 +14,8 @@ import Toolbar from "./shared/components/toolbar";
 import { ExecutionLogPanel } from "./shared/components/execution-log-panel";
 import { NodeResultPanel } from "./shared/components/node-result-panel";
 import { ApiNodeEditor } from "./shared/components/api-node-editor";
-import type { ApiNodeData } from "./shared/components/settings-modal/types";
+import { DbNodeEditor } from "./shared/components/db-node-editor";
+import type { ApiNodeData, DbNodeData } from "./shared/components/settings-modal/types";
 
 export default function App() {
 	return (
@@ -33,6 +35,10 @@ function FlowCanvas() {
 	// API Node Editor state
 	const [apiEditorOpen, setApiEditorOpen] = useState(false);
 	const [editingApiNode, setEditingApiNode] = useState<{ nodeId: string; data: ApiNodeData } | null>(null);
+
+	// DB Node Editor state
+	const [dbEditorOpen, setDbEditorOpen] = useState(false);
+	const [editingDbNode, setEditingDbNode] = useState<{ nodeId: string; data: DbNodeData } | null>(null);
 
 	// 새로운 노드 생성 함수
 	const createNewNode = useCallback((position: { x: number; y: number }, sourceNodeId?: string) => {
@@ -133,7 +139,47 @@ function FlowCanvas() {
 					: node
 			)
 		);
-		// DagService에도 업데이트 반영 필요 시 추가
+		// DagService에도 업데이트 반영
+		const updatedNode = {
+			id: nodeId,
+			type: 'apiNode',
+			data: apiData
+		};
+		DagServiceInstance.updateNode(updatedNode as any);
+	}, [setNodes]);
+
+	// DB 노드 생성 함수
+	const createDbNode = useCallback((dbData: DbNodeData) => {
+		const newNodeId = `db-node-${Date.now()}`;
+		const newNode: any = {
+			id: newNodeId,
+			type: 'dbNode',
+			position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+			data: dbData
+		};
+		
+		setNodes((nds: any) => [...nds, newNode]);
+		DagServiceInstance.addNode(newNode as any);
+		
+		return newNodeId;
+	}, [setNodes]);
+
+	// DB 노드 업데이트 함수
+	const updateDbNode = useCallback((nodeId: string, dbData: DbNodeData) => {
+		setNodes((nds: any) => 
+			nds.map((node: any) => 
+				node.id === nodeId 
+					? { ...node, data: dbData }
+					: node
+			)
+		);
+		// DagService에도 업데이트 반영
+		const updatedNode = {
+			id: nodeId,
+			type: 'dbNode',
+			data: dbData
+		};
+		DagServiceInstance.updateNode(updatedNode as any);
 	}, [setNodes]);
 
 	// 노드 더블클릭 핸들러
@@ -141,6 +187,9 @@ function FlowCanvas() {
 		if (node.type === 'apiNode') {
 			setEditingApiNode({ nodeId: node.id, data: node.data as unknown as ApiNodeData });
 			setApiEditorOpen(true);
+		} else if (node.type === 'dbNode') {
+			setEditingDbNode({ nodeId: node.id, data: node.data as unknown as DbNodeData });
+			setDbEditorOpen(true);
 		}
 	}, []);
 
@@ -157,16 +206,35 @@ function FlowCanvas() {
 		setEditingApiNode(null);
 	}, [editingApiNode, updateApiNode, createApiNode]);
 
+	// DB Editor 저장 핸들러
+	const handleDbEditorSave = useCallback((data: DbNodeData) => {
+		if (editingDbNode) {
+			// 편집 모드
+			updateDbNode(editingDbNode.nodeId, data);
+		} else {
+			// 생성 모드
+			createDbNode(data);
+		}
+		setDbEditorOpen(false);
+		setEditingDbNode(null);
+	}, [editingDbNode, updateDbNode, createDbNode]);
+
 	// API Editor 닫기 핸들러
 	const handleApiEditorClose = useCallback(() => {
 		setApiEditorOpen(false);
 		setEditingApiNode(null);
 	}, []);
 
+	const handleDbEditorClose = useCallback(() => {
+		setDbEditorOpen(false);
+		setEditingDbNode(null);
+	}, []);
+
 	const nodeTypes = useMemo(
 		() => ({
 			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />,
-			apiNode: (nodeProps: any) => <ApiNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
+			apiNode: (nodeProps: any) => <ApiNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />,
+			dbNode: (nodeProps: any) => <DbNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
 		}),
 		[setNodes, setEdges]
 	);
@@ -254,6 +322,10 @@ function FlowCanvas() {
 					setEditingApiNode(null);
 					setApiEditorOpen(true);
 				}}
+				onCreateDbNode={() => {
+					setEditingDbNode(null);
+					setDbEditorOpen(true);
+				}}
 			/>
 			<ApiNodeEditor
 				isOpen={apiEditorOpen}
@@ -261,6 +333,13 @@ function FlowCanvas() {
 				initialData={editingApiNode?.data}
 				onSave={handleApiEditorSave}
 				mode={editingApiNode ? 'edit' : 'create'}
+			/>
+			<DbNodeEditor
+				isOpen={dbEditorOpen}
+				onClose={handleDbEditorClose}
+				initialData={editingDbNode?.data}
+				onSave={handleDbEditorSave}
+				mode={editingDbNode ? 'edit' : 'create'}
 			/>
 		</div>
 	);

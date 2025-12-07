@@ -36,7 +36,7 @@ export const PROJECT_TYPES: { value: ProjectType; label: string; color: string }
   { value: "other", label: "Other", color: "bg-gray-400" }
 ];
 
-export type MenuSection = 'projects' | 'node-creation' | 'general' | 'appearance' | 'editor' | 'shortcuts' | 'about';
+export type MenuSection = 'projects' | 'node-creation' | 'connections' | 'general' | 'appearance' | 'editor' | 'shortcuts' | 'about';
 export type NodeType = 'file' | 'api' | 'db';
 export type FileCreationMode = 'create-new' | 'select-existing';
 
@@ -97,6 +97,85 @@ export interface RequestBody {
 }
 
 // Complete API Node Data matching Postman features
+// Database types
+export type DatabaseType = 'sqlite' | 'oracle' | 'postgresql';
+
+export interface DatabaseConnection {
+  type: DatabaseType;
+  
+  // SQLite
+  filePath?: string;
+  
+  // Oracle & PostgreSQL
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+  
+  // Oracle specific
+  serviceName?: string;
+  sid?: string;
+  
+  // PostgreSQL specific
+  schema?: string;
+  sslMode?: boolean;
+}
+
+export interface SavedQuery {
+  id: string;
+  name: string;
+  description?: string;
+  query: string;
+  databaseType: DatabaseType;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SavedConnection {
+  id: string;
+  name: string;
+  description?: string;
+  connection: DatabaseConnection;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ColumnSelection {
+  columnName: string;
+  alias?: string;
+  enabled: boolean;
+}
+
+export interface PostProcessScript {
+  type: 'javascript' | 'typescript';
+  code: string;
+}
+
+export interface DbNodeData {
+  type: 'db';
+  name: string;
+  description?: string;
+  
+  // Connection configuration
+  connection: DatabaseConnection;
+  
+  // Query
+  query: string;
+  savedQueryId?: string; // Reference to saved query
+  
+  // Column selection for output
+  columnSelection: ColumnSelection[];
+  selectAllColumns: boolean;
+  
+  // Post-processing
+  postProcessScript?: PostProcessScript;
+  
+  // Execution settings
+  timeout?: number; // in milliseconds
+  maxRows?: number; // Limit result rows
+}
+
 export interface ApiNodeData {
   type: 'api';
   name: string;
@@ -129,7 +208,15 @@ export interface ApiNodeData {
   followRedirects?: boolean;
 }
 
-export interface DbNodeData {
+export interface SettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
+  onCreateApiNode?: () => void;
+  onCreateDbNode?: () => void;
+}
+
+export interface DbNodeData_Old {
   type: string;
   connectionString: string;
   schema: string;

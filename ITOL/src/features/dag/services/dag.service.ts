@@ -8,7 +8,8 @@ import { ParameterWithReference, NodeReference } from "../types/node-connection.
 import { resolveAllParameters, getAvailableNodeReferences, getAvailableNodeReferencesExtended } from "../utils/node-reference.utils";
 import { useLogStore } from "@/shared/store/use-log-store";
 import { ApiExecutionService } from "./api-execution.service";
-import type { ApiNodeData } from "@/shared/components/settings-modal/types";
+import { DbExecutionService } from "./db-execution.service";
+import type { ApiNodeData, DbNodeData } from "@/shared/components/settings-modal/types";
 
 /**
  * DagService is a singleton service that manages the Directed Acyclic Graph (DAG) data.
@@ -153,6 +154,17 @@ class DagService {
     this.initDagGraph();
   }
 
+  public updateNode(nodeData: Partial<Node<any>> & { id: string }): void {
+    const index = this.graphNodeData.findIndex(node => node.id === nodeData.id);
+    if (index !== -1) {
+      this.graphNodeData[index] = {
+        ...this.graphNodeData[index],
+        ...nodeData
+      };
+      console.log(`Node updated: ${nodeData.id}`, nodeData);
+    }
+  }
+
   public removeNode(nodeId: string): void {
     // 노드 데이터에서 제거
     this.graphNodeData = this.graphNodeData.filter(node => node.id !== nodeId);
@@ -217,6 +229,26 @@ class DagService {
           }
         } catch (error) {
           console.error(`API node ${nodeId} execution failed:`, error);
+        }
+        return;
+      }
+
+      // DB 노드 타입 체크
+      if ((node.data as any).type === 'db') {
+        console.log(`Running DB node with id: ${nodeId}`);
+        try {
+          await DbExecutionService.executeDbNode(nodeId, node.data as DbNodeData);
+          
+          // 현재 노드 실행 완료 후 다음 노드들을 실행
+          const nextNodeIds = this.getNextNodeIds(nodeId);
+          console.log(`Next nodes to execute: ${nextNodeIds}`);
+          
+          for (const nextNodeId of nextNodeIds) {
+            console.log(`Triggering next node with id: ${nextNodeId}`);
+            await DagServiceInstance.runNode(nextNodeId);
+          }
+        } catch (error) {
+          console.error(`DB node ${nodeId} execution failed:`, error);
         }
         return;
       }

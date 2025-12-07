@@ -21,6 +21,12 @@
 		"fs:allow-create",
 		"fs:allow-rename",
 		"fs:allow-remove",
+		"store:default",
+		"store:allow-get",
+		"store:allow-set",
+		"store:allow-save",
+		"store:allow-load",
+		"store:allow-delete",
 		{
 			"identifier": "fs:scope",
 			"allow": [

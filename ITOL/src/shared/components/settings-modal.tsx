@@ -36,8 +36,9 @@ import {
   MenuSidebar,
   NodeCreationForm
 } from './settings-modal/dialog-components';
+import { ConnectionManagementSection } from './connection-management';
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode, onCreateApiNode }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode, onCreateApiNode, onCreateDbNode }) => {
   const [activeSection, setActiveSection] = useState<MenuSection>('projects');
   const [activeNodeTab, setActiveNodeTab] = useState<NodeType>('file');
   const [fileCreationMode, setFileCreationMode] = useState<FileCreationMode>('select-existing');
@@ -462,10 +463,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                     <Database className="h-16 w-16 mx-auto mb-4 text-purple-500" />
                     <h4 className="font-semibold text-lg mb-2">데이터베이스 노드</h4>
                     <p className="text-sm text-gray-600 mb-6">
-                      데이터베이스 쿼리 노드 기능은 곧 제공될 예정입니다.
+                      SQLite, PostgreSQL, Oracle 데이터베이스에 연결하여 쿼리를 실행합니다.
+                      <br />
+                      쿼리 결과를 다른 노드로 전달하거나 후처리할 수 있습니다.
                     </p>
-                    <Button disabled className="w-full" size="lg">
-                      곧 출시 예정
+                    <Button 
+                      onClick={() => {
+                        if (onCreateDbNode) {
+                          onCreateDbNode();
+                          onClose();
+                        }
+                      }}
+                      className="w-full"
+                      size="lg"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      DB 노드 만들기
                     </Button>
                   </div>
                 )}
@@ -473,6 +486,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             </div>
           </div>
         );
+
+      case 'connections':
+        return <ConnectionManagementSection />;
 
       case 'general':
         return (

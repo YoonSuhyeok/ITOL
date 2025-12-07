@@ -18,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             command::get_sqlite_path_command,
             command::list_dirs_command,
@@ -37,6 +38,8 @@ pub fn run() {
             command::execute_js_command,
             command::execute_ts_command,
             command::execute_api_command,
+            command::execute_db_command,
+            command::test_db_connection_command,
             command::add_project_command,
             command::remove_project_command,
             command::get_projects_command,

@@ -6,9 +6,10 @@ import SettingsModal from "./settings-modal";
 interface ToolbarProps {
   onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
   onCreateApiNode?: () => void;
+  onCreateDbNode?: () => void;
 }
 
-const Toolbar = ({ onCreateFileNode, onCreateApiNode }: ToolbarProps) => {
+const Toolbar = ({ onCreateFileNode, onCreateApiNode, onCreateDbNode }: ToolbarProps) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleSettingsClick = () => {
@@ -40,6 +41,7 @@ const Toolbar = ({ onCreateFileNode, onCreateApiNode }: ToolbarProps) => {
         onClose={handleCloseSettings}
         onCreateFileNode={onCreateFileNode}
         onCreateApiNode={onCreateApiNode}
+        onCreateDbNode={onCreateDbNode}
       />
     </>
   );
