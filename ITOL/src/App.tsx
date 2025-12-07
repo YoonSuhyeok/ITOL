@@ -7,15 +7,25 @@ import { DagServiceInstance } from "./features/dag/services/dag.service";
 import FileNode from "@/entities/language/ui/file-node";
 import ApiNode from "@/entities/api/ui/api-node";
 import DbNode from "@/entities/db/ui/db-node";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
 import WindowHeader from "./shared/components/window-header";
-import Toolbar from "./shared/components/toolbar";
 import { ExecutionLogPanel } from "./shared/components/execution-log-panel";
 import { NodeResultPanel } from "./shared/components/node-result-panel";
 import { ApiNodeEditor } from "./shared/components/api-node-editor";
 import { DbNodeEditor } from "./shared/components/db-node-editor";
 import type { ApiNodeData, DbNodeData } from "./shared/components/settings-modal/types";
+import { FileExplorer, type FileItem } from "./shared/components/file-explorer";
+import { TabBar, type Tab } from "./shared/components/tab-bar";
+import { invoke } from "@tauri-apps/api/core";
+import SettingsModal from "./shared/components/settings-modal";
+
+interface Book {
+	id: number;
+	title: string;
+	parent_id: number | null;
+	flow_data: string | null;
+}
 
 export default function App() {
 	return (
@@ -32,6 +42,111 @@ function FlowCanvas() {
 	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
 	const { screenToFlowPosition } = useReactFlow();
 
+	// File Explorer & Tabs state
+	const [tabs, setTabs] = useState<Tab[]>([]);
+	const [activeTabId, setActiveTabId] = useState<string>("");
+	const [selectedFileId, setSelectedFileId] = useState<string>();
+	const [fileItems, setFileItems] = useState<FileItem[]>([]);
+	const [books, setBooks] = useState<Book[]>([]);
+	
+	// Load books from database
+	useEffect(() => {
+		const loadBooks = async () => {
+			try {
+				const allBooks = await invoke<Book[]>("get_all_books_command");
+				setBooks(allBooks);
+				
+				// Convert books to file items
+				const items = convertBooksToFileItems(allBooks);
+				setFileItems(items);
+				
+				// Open first book as default tab if exists
+				if (allBooks.length > 0 && tabs.length === 0) {
+					const firstBook = allBooks[0];
+					const newTab: Tab = {
+						id: `book-${firstBook.id}`,
+						title: firstBook.title,
+						type: "flow"
+					};
+					setTabs([newTab]);
+					setActiveTabId(newTab.id);
+					
+					// Load flow data if exists
+					if (firstBook.flow_data) {
+						try {
+							const flowData = JSON.parse(firstBook.flow_data);
+							setNodes(flowData.nodes || []);
+							setEdges(flowData.edges || []);
+						} catch (e) {
+							console.error("Failed to parse flow data:", e);
+						}
+					}
+				}
+			} catch (error) {
+				console.error("Failed to load books:", error);
+			}
+		};
+		
+		loadBooks();
+	}, []);
+	
+	// Convert books to file items hierarchy
+	const convertBooksToFileItems = (books: Book[]): FileItem[] => {
+		const bookMap = new Map<number, FileItem>();
+		const rootItems: FileItem[] = [];
+		
+		// First pass: create all items
+		for (const book of books) {
+			const item: FileItem = {
+				id: `book-${book.id}`,
+				name: book.title,
+				type: "folder",
+				path: `/book-${book.id}`,
+				children: []
+			};
+			bookMap.set(book.id, item);
+		}
+		
+		// Second pass: build hierarchy
+		for (const book of books) {
+			const item = bookMap.get(book.id);
+			if (!item) continue;
+			
+			if (book.parent_id === null) {
+				rootItems.push(item);
+			} else {
+				const parent = bookMap.get(book.parent_id);
+				if (parent && parent.children) {
+					parent.children.push(item);
+				}
+			}
+		}
+		
+		return rootItems;
+	};
+	
+	// Save current flow data to database
+	const saveCurrentFlow = useCallback(async () => {
+		if (!activeTabId || !activeTabId.startsWith("book-")) return;
+		
+		const bookId = Number.parseInt(activeTabId.replace("book-", ""));
+		const flowData = JSON.stringify({ nodes, edges });
+		
+		try {
+			const currentBook = books.find(b => b.id === bookId);
+			if (currentBook) {
+				await invoke("update_book_command", {
+					id: bookId,
+					title: currentBook.title,
+					parentId: currentBook.parent_id,
+					flowData: flowData
+				});
+			}
+		} catch (error) {
+			console.error("Failed to save flow:", error);
+		}
+	}, [activeTabId, nodes, edges, books]);
+
 	// API Node Editor state
 	const [apiEditorOpen, setApiEditorOpen] = useState(false);
 	const [editingApiNode, setEditingApiNode] = useState<{ nodeId: string; data: ApiNodeData } | null>(null);
@@ -39,6 +154,124 @@ function FlowCanvas() {
 	// DB Node Editor state
 	const [dbEditorOpen, setDbEditorOpen] = useState(false);
 	const [editingDbNode, setEditingDbNode] = useState<{ nodeId: string; data: DbNodeData } | null>(null);
+
+	// Settings Modal state
+	const [settingsOpen, setSettingsOpen] = useState(false);
+
+	// File click handler
+	const handleFileClick = useCallback((item: FileItem) => {
+		setSelectedFileId(item.id);
+		
+		if (item.id.startsWith("book-")) {
+			// Check if tab already exists
+			const existingTab = tabs.find(tab => tab.id === item.id);
+			
+			if (!existingTab) {
+				const newTab: Tab = {
+					id: item.id,
+					title: item.name,
+					type: "flow"
+				};
+				
+				setTabs(prev => [...prev, newTab]);
+			}
+			
+			// Save current flow before switching
+			if (activeTabId && activeTabId !== item.id) {
+				saveCurrentFlow();
+			}
+			
+			// Load the book's flow data
+			const bookId = Number.parseInt(item.id.replace("book-", ""));
+			const book = books.find(b => b.id === bookId);
+			if (book && book.flow_data) {
+				try {
+					const flowData = JSON.parse(book.flow_data);
+					setNodes(flowData.nodes || []);
+					setEdges(flowData.edges || []);
+				} catch (e) {
+					console.error("Failed to parse flow data:", e);
+					setNodes([]);
+					setEdges([]);
+				}
+			} else {
+				setNodes([]);
+				setEdges([]);
+			}
+			
+			setActiveTabId(item.id);
+		}
+	}, [tabs, books, activeTabId, saveCurrentFlow, setNodes, setEdges]);
+
+	// Tab handlers
+	const handleTabClick = useCallback((tabId: string) => {
+		if (activeTabId !== tabId) {
+			// Save current flow before switching
+			saveCurrentFlow();
+			
+			// Load the new tab's flow data
+			const bookId = Number.parseInt(tabId.replace("book-", ""));
+			const book = books.find(b => b.id === bookId);
+			if (book && book.flow_data) {
+				try {
+					const flowData = JSON.parse(book.flow_data);
+					setNodes(flowData.nodes || []);
+					setEdges(flowData.edges || []);
+				} catch (e) {
+					console.error("Failed to parse flow data:", e);
+					setNodes([]);
+					setEdges([]);
+				}
+			} else {
+				setNodes([]);
+				setEdges([]);
+			}
+			
+			setActiveTabId(tabId);
+		}
+	}, [activeTabId, books, saveCurrentFlow, setNodes, setEdges]);
+
+	const handleTabClose = useCallback((tabId: string) => {
+		// Save before closing
+		if (activeTabId === tabId) {
+			saveCurrentFlow();
+		}
+		
+		setTabs(prev => {
+			const newTabs = prev.filter(tab => tab.id !== tabId);
+			
+			// If closing active tab, switch to another tab
+			if (activeTabId === tabId && newTabs.length > 0) {
+				const newActiveId = newTabs[newTabs.length - 1].id;
+				
+				// Load the new active tab's flow data
+				const bookId = Number.parseInt(newActiveId.replace("book-", ""));
+				const book = books.find(b => b.id === bookId);
+				if (book && book.flow_data) {
+					try {
+						const flowData = JSON.parse(book.flow_data);
+						setNodes(flowData.nodes || []);
+						setEdges(flowData.edges || []);
+					} catch (e) {
+						console.error("Failed to parse flow data:", e);
+						setNodes([]);
+						setEdges([]);
+					}
+				} else {
+					setNodes([]);
+					setEdges([]);
+				}
+				
+				setActiveTabId(newActiveId);
+			} else if (newTabs.length === 0) {
+				setActiveTabId("");
+				setNodes([]);
+				setEdges([]);
+			}
+			
+			return newTabs;
+		});
+	}, [activeTabId, books, saveCurrentFlow, setNodes, setEdges]);
 
 	// 새로운 노드 생성 함수
 	const createNewNode = useCallback((position: { x: number; y: number }, sourceNodeId?: string) => {
@@ -290,43 +523,65 @@ function FlowCanvas() {
 
 	return (
 		<div style={{ width: "100vw", height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-			<WindowHeader />
+			<WindowHeader onSettingsClick={() => setSettingsOpen(true)} />
 			<div style={{ 
 				width: "100%", 
 				flex: 1,
-				marginTop: "65px",
 				overflow: "hidden",
 				display: "flex",
-				flexDirection: "column"
+				flexDirection: "row"
 			}}>
-				<div style={{ flex: 1, position: "relative" }}>
-					<ReactFlow
-						nodeTypes={nodeTypes}
-						nodes={nodes}
-						edges={edges}
-						onNodesChange={onNodesChange}
-						onEdgesChange={onEdgesChange}
-						onConnect={onConnect}
-						onConnectEnd={onConnectEnd}
-						onNodeDoubleClick={onNodeDoubleClick}
-					>
-						<Background />
-					</ReactFlow>
-					<NodeResultPanel />
+				{/* Left Sidebar - File Explorer */}
+				<div style={{ width: "250px", height: "100%", borderRight: "1px solid var(--border)" }}>
+					<FileExplorer 
+						items={fileItems}
+						onFileClick={handleFileClick}
+						selectedId={selectedFileId}
+					/>
 				</div>
-				<ExecutionLogPanel />
+
+				{/* Main Content Area */}
+				<div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+					{/* Tab Bar */}
+					<TabBar 
+						tabs={tabs}
+						activeTabId={activeTabId}
+						onTabClick={handleTabClick}
+						onTabClose={handleTabClose}
+					/>
+
+					{/* Content Area */}
+					<div style={{ flex: 1, position: "relative", display: "flex", flexDirection: "column" }}>
+						{activeTabId && activeTabId.startsWith("book-") ? (
+							<>
+								<div style={{ flex: 1, position: "relative" }}>
+									<ReactFlow
+										nodeTypes={nodeTypes}
+										nodes={nodes}
+										edges={edges}
+										onNodesChange={onNodesChange}
+										onEdgesChange={onEdgesChange}
+										onConnect={onConnect}
+										onConnectEnd={onConnectEnd}
+										onNodeDoubleClick={onNodeDoubleClick}
+									>
+										<Background />
+									</ReactFlow>
+									<NodeResultPanel />
+								</div>
+								<ExecutionLogPanel />
+							</>
+						) : (
+							<div style={{ flex: 1, padding: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+								<div style={{ textAlign: "center" }}>
+									<h2 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>No Flow Selected</h2>
+									<p style={{ color: "var(--muted-foreground)" }}>Select a flow from the explorer to start editing</p>
+								</div>
+							</div>
+						)}
+					</div>
+				</div>
 			</div>
-			<Toolbar 
-				onCreateFileNode={createFileNode}
-				onCreateApiNode={() => {
-					setEditingApiNode(null);
-					setApiEditorOpen(true);
-				}}
-				onCreateDbNode={() => {
-					setEditingDbNode(null);
-					setDbEditorOpen(true);
-				}}
-			/>
 			<ApiNodeEditor
 				isOpen={apiEditorOpen}
 				onClose={handleApiEditorClose}
@@ -340,6 +595,21 @@ function FlowCanvas() {
 				initialData={editingDbNode?.data}
 				onSave={handleDbEditorSave}
 				mode={editingDbNode ? 'edit' : 'create'}
+			/>
+			<SettingsModal
+				isOpen={settingsOpen}
+				onClose={() => setSettingsOpen(false)}
+				onCreateFileNode={createFileNode}
+				onCreateApiNode={() => {
+					setEditingApiNode(null);
+					setApiEditorOpen(true);
+					setSettingsOpen(false);
+				}}
+				onCreateDbNode={() => {
+					setEditingDbNode(null);
+					setDbEditorOpen(true);
+					setSettingsOpen(false);
+				}}
 			/>
 		</div>
 	);

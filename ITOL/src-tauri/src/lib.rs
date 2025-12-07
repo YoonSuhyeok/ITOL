@@ -51,7 +51,12 @@ pub fn run() {
             command::get_allowed_paths_command,
             command::request_project_folder_command,
             command::detect_project_type_command,
-            command::folder::file::get_file_stats
+            command::folder::file::get_file_stats,
+            command::get_all_books_command,
+            command::get_book_by_id_command,
+            command::create_book_command,
+            command::update_book_command,
+            command::delete_book_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

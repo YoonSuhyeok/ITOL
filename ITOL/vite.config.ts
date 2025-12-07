@@ -3,16 +3,29 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+const ReactCompilerConfig = {
+  /* React Compiler 옵션 */
+};
+
+const host = process.env.TAURI_DEV_HOST as string | undefined;
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
-	plugins: [react(), tailwindcss()],
+	plugins: [
+		react({
+			babel: {
+				plugins: [
+					["babel-plugin-react-compiler", ReactCompilerConfig],
+				],
+			},
+		}),
+		tailwindcss(),
+	],
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
 		},
+		dedupe: ['react', 'react-dom'],
 	},
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//

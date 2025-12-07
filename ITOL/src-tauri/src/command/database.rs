@@ -58,6 +58,7 @@ async fn create_table_book(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             parent_id INTEGER,
+            flow_data TEXT,
             FOREIGN KEY (parent_id) REFERENCES Book(id) ON DELETE CASCADE
         )"
     )

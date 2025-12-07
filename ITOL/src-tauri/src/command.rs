@@ -247,3 +247,48 @@ pub async fn check_oracle_installed() -> Result<oracle_installer::OracleInstallS
 pub async fn install_oracle_client() -> Result<String, String> {
     oracle_installer::install_oracle_client().await
 }
+
+// Book CRUD Commands
+#[command]
+pub async fn get_all_books_command() -> Result<Vec<database::book::Book>, String> {
+    database::book::get_all_books()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn get_book_by_id_command(id: i32) -> Result<database::book::Book, String> {
+    database::book::get_book_by_id(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn create_book_command(
+    title: String,
+    parent_id: Option<i32>,
+    flow_data: Option<String>,
+) -> Result<i32, String> {
+    database::book::create_book(title, parent_id, flow_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn update_book_command(
+    id: i32,
+    title: String,
+    parent_id: Option<i32>,
+    flow_data: Option<String>,
+) -> Result<(), String> {
+    database::book::update_book(id, title, parent_id, flow_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn delete_book_command(id: i32) -> Result<(), String> {
+    database::book::delete_book(id)
+        .await
+        .map_err(|e| e.to_string())
+}

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { X, Minus, Square } from 'lucide-react';
+import { X, Minus, Square, Settings } from 'lucide-react';
 import styles from './window-header.module.css';
 
 interface WindowHeaderProps {
   title?: string;
+  onSettingsClick?: () => void;
 }
 
 const WindowHeader: React.FC<WindowHeaderProps> = ({
-  title = "ITOL"
+  title = "ITOL",
+  onSettingsClick
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -72,6 +74,13 @@ const WindowHeader: React.FC<WindowHeaderProps> = ({
         <div className={styles.windowControls}>
           <button 
             className={styles.windowButton}
+            onClick={onSettingsClick}
+            aria-label="Settings"
+          >
+            <Settings size={14} />
+          </button>
+          <button 
+            className={styles.windowButton}
             onClick={handleMinimize}
             aria-label="Minimize"
           >
@@ -90,30 +99,6 @@ const WindowHeader: React.FC<WindowHeaderProps> = ({
             aria-label="Close"
           >
             <X size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* 탭바 */}
-      <div className={styles.tabBar} data-tauri-drag-region>
-        <div className={styles.tabs}>
-          <div className={`${styles.tab} ${styles.activeTab}`}>
-            <span className={styles.tabLabel}>App.tsx</span>
-            <button className={styles.tabCloseBtn}>
-              <X size={12} />
-            </button>
-          </div>
-          <div className={styles.tab}>
-            <span className={styles.tabLabel}>main.tsx</span>
-            <button className={styles.tabCloseBtn}>
-              <X size={12} />
-            </button>
-          </div>
-        </div>
-        
-        <div className={styles.tabActions}>
-          <button className={styles.newTabBtn} aria-label="New tab">
-            +
           </button>
         </div>
       </div>
