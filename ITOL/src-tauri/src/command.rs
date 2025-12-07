@@ -267,9 +267,8 @@ pub async fn get_book_by_id_command(id: i32) -> Result<database::book::Book, Str
 pub async fn create_book_command(
     title: String,
     parent_id: Option<i32>,
-    flow_data: Option<String>,
 ) -> Result<i32, String> {
-    database::book::create_book(title, parent_id, flow_data)
+    database::book::create_book(title, parent_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -279,9 +278,8 @@ pub async fn update_book_command(
     id: i32,
     title: String,
     parent_id: Option<i32>,
-    flow_data: Option<String>,
 ) -> Result<(), String> {
-    database::book::update_book(id, title, parent_id, flow_data)
+    database::book::update_book(id, title, parent_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -289,6 +287,83 @@ pub async fn update_book_command(
 #[command]
 pub async fn delete_book_command(id: i32) -> Result<(), String> {
     database::book::delete_book(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// Page CRUD Commands
+#[command]
+pub async fn get_page_by_id_command(id: i32) -> Result<database::page::Page, String> {
+    database::page::get_page_by_id(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn get_pages_by_book_id_command(book_id: i32) -> Result<Vec<database::page::Page>, String> {
+    database::page::get_pages_by_book_id(book_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn create_page_command(
+    fk_book_id: i32,
+    title: String,
+    flow_data: Option<String>,
+) -> Result<i32, String> {
+    database::page::create_page(fk_book_id, title, flow_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn update_page_command(
+    id: i32,
+    fk_book_id: i32,
+    title: String,
+    flow_data: Option<String>,
+) -> Result<(), String> {
+    database::page::update_page(id, fk_book_id, title, flow_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn delete_page_command(id: i32) -> Result<(), String> {
+    database::page::delete_page(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn debug_get_all_pages_command() -> Result<Vec<database::page::Page>, String> {
+    use sqlx::Row;
+    let pool = database::get_db_pool().await;
+    
+    let pages = sqlx::query("SELECT id, fk_book_id, title, flow_data, display_order FROM Page ORDER BY fk_book_id, display_order")
+        .map(|row: sqlx::sqlite::SqliteRow| {
+            database::page::Page {
+                id: row.get(0),
+                fk_book_id: row.get(1),
+                title: row.get(2),
+                flow_data: row.get(3),
+                display_order: row.get(4),
+            }
+        })
+        .fetch_all(&*pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    Ok(pages)
+}
+
+#[command]
+pub async fn reorder_pages_command(
+    book_id: i32,
+    page_ids_in_order: Vec<i32>,
+) -> Result<(), String> {
+    database::page::reorder_pages(book_id, page_ids_in_order)
         .await
         .map_err(|e| e.to_string())
 }

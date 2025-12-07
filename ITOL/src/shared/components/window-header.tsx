@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
-import { X, Minus, Square, Settings } from 'lucide-react';
+import { X, Minus, Square, Settings, FileJson } from 'lucide-react';
 import styles from './window-header.module.css';
 
 interface WindowHeaderProps {
   title?: string;
   onSettingsClick?: () => void;
+  resultPanelCollapsed?: boolean;
+  onToggleResultPanel?: () => void;
+  resultCount?: number;
 }
 
 const WindowHeader: React.FC<WindowHeaderProps> = ({
   title = "ITOL",
-  onSettingsClick
+  onSettingsClick,
+  resultPanelCollapsed,
+  onToggleResultPanel,
+  resultCount = 0
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -72,6 +78,20 @@ const WindowHeader: React.FC<WindowHeaderProps> = ({
 
         {/* 우측 윈도우 컨트롤 */}
         <div className={styles.windowControls}>
+          {/* Collapsed Node Results Panel Icon */}
+          {resultPanelCollapsed && (
+            <button 
+              className={`${styles.windowButton} ${styles.panelButton}`}
+              onClick={onToggleResultPanel}
+              aria-label="Open Node Results"
+              title="Open Node Results"
+            >
+              <FileJson size={14} className={styles.panelIcon} />
+              {resultCount > 0 && (
+                <span className={styles.badge}>{resultCount}</span>
+              )}
+            </button>
+          )}
           <button 
             className={styles.windowButton}
             onClick={onSettingsClick}

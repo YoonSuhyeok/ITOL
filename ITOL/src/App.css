@@ -133,3 +133,31 @@ html, body {
 		@apply bg-background text-foreground;
 	}
 }
+
+/* Panel resize handle styles */
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id] {
+	position: relative;
+}
+
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id]::before {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 4px;
+	height: 32px;
+	border-radius: 2px;
+	background: var(--border);
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id]:hover::before,
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id][data-resize-handle-active]::before {
+	opacity: 1;
+}
+
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id][data-resize-handle-active] {
+	background: rgba(59, 130, 246, 0.3);
+}

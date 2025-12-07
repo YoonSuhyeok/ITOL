@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, FileJson, Clock, CheckCircle2, XCircle, Terminal } from 'lucide-react';
+import { X, ChevronRight, FileJson, Clock, CheckCircle2, XCircle, Terminal } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useNodeStore } from '../store/use-node-store';
 
-export const NodeResultPanel: React.FC = () => {
+interface NodeResultPanelProps {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export const NodeResultPanel: React.FC<NodeResultPanelProps> = ({ collapsed, onToggleCollapse }) => {
   const { nodeResults } = useNodeStore();
-  const [isOpen, setIsOpen] = useState(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Convert nodeResults object to array
@@ -43,23 +47,32 @@ export const NodeResultPanel: React.FC = () => {
     }
   };
 
-  if (!isOpen) {
+  // Collapsed view - icon only header on the right
+  if (collapsed) {
     return (
-      <div className="fixed right-0 top-[65px] bottom-12 z-40">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsOpen(true)}
-          className="h-full rounded-none rounded-l-lg border-r-0 bg-white shadow-md hover:bg-gray-50"
+      <div className="h-full bg-white border-l flex flex-col items-center py-2 w-12">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="p-2 hover:bg-gray-100 rounded transition-colors mb-2"
+          title="Expand Node Results"
         >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+          <FileJson className="w-5 h-5 text-blue-600" />
+        </button>
+        {resultsArray.length > 0 && (
+          <>
+            <div className="w-8 h-px bg-gray-200 mb-2" />
+            <Badge variant="outline" className="text-xs px-1.5">
+              {resultsArray.length}
+            </Badge>
+          </>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="fixed right-0 top-[65px] bottom-12 w-96 bg-white border-l shadow-lg z-40 flex flex-col">
+    <div className="bg-white border-l shadow-lg flex flex-col h-full w-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
         <div className="flex items-center gap-2">
@@ -73,8 +86,9 @@ export const NodeResultPanel: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsOpen(false)}
+            onClick={onToggleCollapse}
             className="h-7 w-7 p-0"
+            title="Collapse Panel"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

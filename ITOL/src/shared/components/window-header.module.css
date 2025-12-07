@@ -7,7 +7,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
 }
@@ -89,4 +89,32 @@
 .closeButton:hover {
   background-color: #e81123 !important;
   color: white;
+}
+
+/* Panel button with badge */
+.panelButton {
+  position: relative;
+  width: 36px;
+  margin-right: 4px;
+}
+
+.panelIcon {
+  color: #3b82f6;
+}
+
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: #3b82f6;
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

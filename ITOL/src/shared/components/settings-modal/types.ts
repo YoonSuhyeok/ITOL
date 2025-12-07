@@ -176,6 +176,13 @@ export interface DbNodeData {
   maxRows?: number; // Limit result rows
 }
 
+export interface FileNodeData {
+  type: 'file';
+  name: string;
+  description?: string;
+  content?: string;
+}
+
 export interface ApiNodeData {
   type: 'api';
   name: string;

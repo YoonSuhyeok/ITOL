@@ -56,7 +56,14 @@ pub fn run() {
             command::get_book_by_id_command,
             command::create_book_command,
             command::update_book_command,
-            command::delete_book_command
+            command::delete_book_command,
+            command::get_page_by_id_command,
+            command::get_pages_by_book_id_command,
+            command::create_page_command,
+            command::update_page_command,
+            command::delete_page_command,
+            command::reorder_pages_command,
+            command::debug_get_all_pages_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

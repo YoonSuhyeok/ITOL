@@ -45,7 +45,7 @@ const BODY_TYPES: { value: BodyType; label: string }[] = [
 
 const defaultApiNodeData: ApiNodeData = {
   type: 'api',
-  name: 'New API Request',
+  name: '',
   description: '',
   method: 'GET',
   url: '',
