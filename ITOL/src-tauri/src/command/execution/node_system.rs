@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use log::{debug, info, warn, error};
-use tauri::Emitter;
 
 #[derive(Debug, Serialize, Clone)]
 struct ExecutionLogEvent {

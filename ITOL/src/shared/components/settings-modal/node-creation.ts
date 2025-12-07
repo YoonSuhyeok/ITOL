@@ -54,16 +54,35 @@ export function validateApiNodeData(apiData: ApiNodeData): string[] {
 export function validateDbNodeData(dbData: DbNodeData): string[] {
   const errors: string[] = [];
   
-  if (!dbData.connectionString.trim()) {
-    errors.push('연결 문자열을 입력해야 합니다.');
+  if (!dbData.query?.trim()) {
+    errors.push('SQL 쿼리를 입력해야 합니다.');
   }
   
-  if (!dbData.schema.trim()) {
-    errors.push('스키마를 입력해야 합니다.');
-  }
-  
-  if (!dbData.table.trim()) {
-    errors.push('테이블을 입력해야 합니다.');
+  // Connection validation
+  if (dbData.connection.type === 'sqlite') {
+    if (!dbData.connection.filePath?.trim()) {
+      errors.push('SQLite 파일 경로를 입력해야 합니다.');
+    }
+  } else if (dbData.connection.type === 'postgresql') {
+    if (!dbData.connection.host?.trim()) {
+      errors.push('호스트를 입력해야 합니다.');
+    }
+    if (!dbData.connection.database?.trim()) {
+      errors.push('데이터베이스 이름을 입력해야 합니다.');
+    }
+    if (!dbData.connection.username?.trim()) {
+      errors.push('사용자 이름을 입력해야 합니다.');
+    }
+  } else if (dbData.connection.type === 'oracle') {
+    if (!dbData.connection.host?.trim()) {
+      errors.push('호스트를 입력해야 합니다.');
+    }
+    if (!dbData.connection.serviceName?.trim() && !dbData.connection.sid?.trim()) {
+      errors.push('Service Name 또는 SID를 입력해야 합니다.');
+    }
+    if (!dbData.connection.username?.trim()) {
+      errors.push('사용자 이름을 입력해야 합니다.');
+    }
   }
   
   return errors;
@@ -128,16 +147,15 @@ export function prepareDbNodeData(dbData: DbNodeData): {
   type: 'db';
   data: DbNodeData;
 } {
-  const name = `${dbData.schema}.${dbData.table}`;
+  // Generate name from query or use provided name
+  const name = dbData.name || 'Database Query';
   
   return {
     name,
     type: 'db',
     data: {
       ...dbData,
-      connectionString: dbData.connectionString.trim(),
-      schema: dbData.schema.trim(),
-      table: dbData.table.trim(),
+      query: dbData.query.trim(),
       description: dbData.description?.trim() || undefined
     }
   };

@@ -217,6 +217,112 @@ pub async fn execute_postgresql_query(
     Ok(response.to_string())
 }
 
+/// Oracle 데이터베이스에 연결하고 쿼리 실행
+pub async fn execute_oracle_query(
+    host: &str,
+    port: u16,
+    service_name: Option<&str>,
+    sid: Option<&str>,
+    username: &str,
+    password: &str,
+    query: &str,
+    max_rows: Option<i32>,
+) -> Result<String, String> {
+    println!("Connecting to Oracle database: {}:{}", host, port);
+
+    // Oracle 연결 문자열 생성
+    let connect_string = if let Some(service) = service_name {
+        format!("//{}:{}/{}", host, port, service)
+    } else if let Some(sid_val) = sid {
+        format!("{}:{}/{}", host, port, sid_val)
+    } else {
+        return Err("Either service_name or sid must be provided for Oracle connection".to_string());
+    };
+
+    println!("Oracle connect string: {}", connect_string);
+
+    // Oracle 연결 생성 (동기 방식이므로 blocking task로 실행)
+    let username_owned = username.to_string();
+    let password_owned = password.to_string();
+    let connect_string_owned = connect_string.clone();
+    let query_owned = query.to_string();
+    let max = max_rows.unwrap_or(1000) as usize;
+
+    let result = tokio::task::spawn_blocking(move || {
+        // Oracle 연결 생성
+        let conn = oracle::Connection::connect(&username_owned, &password_owned, &connect_string_owned)
+            .map_err(|e| format!("Failed to connect to Oracle: {}", e))?;
+
+        println!("Connected to Oracle. Executing query: {}", query_owned);
+
+        // 쿼리 실행
+        let rows = conn.query(&query_owned, &[])
+            .map_err(|e| format!("Query execution failed: {}", e))?;
+
+        // 결과를 JSON으로 변환
+        let mut results: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+
+        for (idx, row_result) in rows.enumerate() {
+            if idx >= max {
+                break;
+            }
+
+            let row = row_result.map_err(|e| format!("Failed to fetch row: {}", e))?;
+            let mut row_map = HashMap::new();
+
+            // Oracle Row에서 컬럼 추출
+            let column_info = row.column_info();
+            for (col_idx, col_info) in column_info.iter().enumerate() {
+                let col_name = col_info.name();
+
+                // Oracle 타입에 따라 값 추출
+                let value: serde_json::Value = match col_info.oracle_type() {
+                    _ if row.get::<usize, Option<String>>(col_idx).is_ok() => {
+                        if let Ok(Some(val)) = row.get::<usize, Option<String>>(col_idx) {
+                            serde_json::Value::String(val)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }
+                    _ if row.get::<usize, Option<i64>>(col_idx).is_ok() => {
+                        if let Ok(Some(val)) = row.get::<usize, Option<i64>>(col_idx) {
+                            serde_json::Value::Number(val.into())
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }
+                    _ if row.get::<usize, Option<f64>>(col_idx).is_ok() => {
+                        if let Ok(Some(val)) = row.get::<usize, Option<f64>>(col_idx) {
+                            serde_json::json!(val)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }
+                    _ => serde_json::Value::Null,
+                };
+
+                row_map.insert(col_name.to_string(), value);
+            }
+
+            results.push(row_map);
+        }
+
+        let total_rows = results.len();
+        let response = serde_json::json!({
+            "success": true,
+            "rowCount": total_rows,
+            "data": results,
+            "truncated": total_rows >= max,
+        });
+
+        Ok::<String, String>(response.to_string())
+    })
+    .await
+    .map_err(|e| format!("Oracle task failed: {}", e))??;
+
+    Ok(result)
+}
+
 /// 데이터베이스 연결 테스트
 pub async fn test_connection(connection: DatabaseConnection) -> Result<String, String> {
     match connection {
@@ -262,9 +368,41 @@ pub async fn test_connection(connection: DatabaseConnection) -> Result<String, S
             pool.close().await;
             Ok("PostgreSQL connection successful".to_string())
         }
-        DatabaseConnection::Oracle { .. } => {
-            // Oracle은 별도의 크레이트가 필요하므로 현재는 미지원
-            Err("Oracle database is not yet supported. Coming soon.".to_string())
+        DatabaseConnection::Oracle { host, port, service_name, sid, username, password } => {
+            let host = host.ok_or("Oracle host is required")?;
+            let port = port.unwrap_or(1521);
+            let username = username.ok_or("Username is required")?;
+            let password = password.ok_or("Password is required")?;
+
+            let host_owned = host.clone();
+            let username_owned = username.clone();
+            let password_owned = password.clone();
+            let service_name_owned = service_name.clone();
+            let sid_owned = sid.clone();
+
+            // Oracle 연결 테스트 (동기 방식이므로 blocking task로 실행)
+            let result = tokio::task::spawn_blocking(move || {
+                let connect_string = if let Some(service) = service_name_owned {
+                    format!("//{}:{}/{}", host_owned, port, service)
+                } else if let Some(sid_val) = sid_owned {
+                    format!("{}:{}/{}", host_owned, port, sid_val)
+                } else {
+                    return Err("Either service_name or sid must be provided for Oracle connection".to_string());
+                };
+
+                let conn = oracle::Connection::connect(&username_owned, &password_owned, &connect_string)
+                    .map_err(|e| format!("Connection failed: {}", e))?;
+
+                // 간단한 쿼리로 연결 테스트
+                conn.query("SELECT 1 FROM DUAL", &[])
+                    .map_err(|e| format!("Test query failed: {}", e))?;
+
+                Ok::<String, String>("Oracle connection successful".to_string())
+            })
+            .await
+            .map_err(|e| format!("Oracle connection task failed: {}", e))??;
+
+            Ok(result)
         }
     }
 }
@@ -300,8 +438,25 @@ pub async fn execute_db_query(params: ExecuteDbParams) -> Result<String, String>
             )
             .await
         }
-        DatabaseConnection::Oracle { .. } => {
-            Err("Oracle database is not yet supported. Coming soon.".to_string())
+        DatabaseConnection::Oracle { 
+            host, port, service_name, sid, username, password 
+        } => {
+            let host = host.ok_or("Oracle host is required")?;
+            let port = port.unwrap_or(1521);
+            let username = username.ok_or("Username is required")?;
+            let password = password.ok_or("Password is required")?;
+
+            execute_oracle_query(
+                &host,
+                port,
+                service_name.as_deref(),
+                sid.as_deref(),
+                &username,
+                &password,
+                &params.query,
+                params.max_rows,
+            )
+            .await
         }
     }
 }

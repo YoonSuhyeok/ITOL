@@ -40,6 +40,8 @@ pub fn run() {
             command::execute_api_command,
             command::execute_db_command,
             command::test_db_connection_command,
+            command::check_oracle_installed,
+            command::install_oracle_client,
             command::add_project_command,
             command::remove_project_command,
             command::get_projects_command,

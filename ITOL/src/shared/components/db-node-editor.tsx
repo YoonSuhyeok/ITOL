@@ -21,6 +21,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { QueryStorageServiceInstance } from '../services/query-storage.service';
 import { ConnectionStorageServiceInstance } from '../services/connection-storage.service';
 import { open } from '@tauri-apps/plugin-dialog';
+import { OracleInstallerDialog } from './oracle-installer-dialog';
 
 interface DbNodeEditorProps {
   isOpen: boolean;
@@ -73,6 +74,9 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
   const [showLoadConnectionDialog, setShowLoadConnectionDialog] = useState(false);
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([]);
   const [connectionSearchTerm, setConnectionSearchTerm] = useState('');
+
+  // Oracle installer state
+  const [showOracleInstaller, setShowOracleInstaller] = useState(false);
 
   // Load saved queries when load dialog opens
   useEffect(() => {
@@ -216,10 +220,21 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
         message: result || 'Connection successful!',
       });
     } catch (error: any) {
+      const errorMsg = error.message || error.toString() || 'Connection failed';
+      
       setConnectionTestResult({
         success: false,
-        message: error.message || error.toString() || 'Connection failed',
+        message: errorMsg,
       });
+
+      // Oracle 연결 실패 시 Instant Client 미설치 감지
+      if (data.connection.type === 'oracle' && 
+          (errorMsg.includes('DPI-1047') || 
+           errorMsg.includes('Cannot locate') || 
+           errorMsg.includes('not yet supported'))) {
+        // 설치 다이얼로그 표시
+        setTimeout(() => setShowOracleInstaller(true), 1000);
+      }
     } finally {
       setIsTestingConnection(false);
     }
@@ -412,6 +427,13 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
               {/* Oracle Configuration */}
               {data.connection.type === 'oracle' && (
                 <>
+                  <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> Oracle connection requires Oracle Instant Client to be installed on your system.
+                      Either Service Name or SID must be provided.
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Host</Label>
@@ -433,21 +455,23 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
                   </div>
 
                   <div>
-                    <Label>Service Name</Label>
+                    <Label>Service Name *</Label>
                     <Input
                       value={data.connection.serviceName || ''}
                       onChange={(e: any) => updateConnection('serviceName', e.target.value)}
                       placeholder="ORCL"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Preferred connection method</p>
                   </div>
 
                   <div>
-                    <Label>SID (Optional)</Label>
+                    <Label>SID (Alternative to Service Name)</Label>
                     <Input
                       value={data.connection.sid || ''}
                       onChange={(e: any) => updateConnection('sid', e.target.value)}
                       placeholder="SID"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Use only if Service Name is not available</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -831,6 +855,16 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Oracle Installer Dialog */}
+      <OracleInstallerDialog 
+        isOpen={showOracleInstaller}
+        onClose={() => setShowOracleInstaller(false)}
+        onInstallComplete={() => {
+          setShowOracleInstaller(false);
+          alert('Oracle Instant Client installed! Please restart the application.');
+        }}
+      />
     </Dialog>
   );
 };

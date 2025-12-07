@@ -2,6 +2,7 @@ pub mod database;
 pub mod folder;
 pub mod execution;
 pub mod project_manager;
+pub mod oracle_installer;
 
 use tauri::command;
 
@@ -235,4 +236,14 @@ pub async fn request_project_folder_command(
 #[command]
 pub async fn detect_project_type_command(path: String) -> Result<String, String> {
     project_manager::detect_project_type_internal(path).await
+}
+
+#[command]
+pub async fn check_oracle_installed() -> Result<oracle_installer::OracleInstallStatus, String> {
+    oracle_installer::check_oracle_installed().await
+}
+
+#[command]
+pub async fn install_oracle_client() -> Result<String, String> {
+    oracle_installer::install_oracle_client().await
 }

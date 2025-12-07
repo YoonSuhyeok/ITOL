@@ -1,7 +1,7 @@
 import FileNodeData from "@/entities/language/model/file-type";
 import { useNodeStore } from "@/shared/store/use-node-store";
 import Parameter from "@/shared/types/node-parameter-type";
-import { Edge, MarkerType, Node } from "@xyflow/react";
+import { Edge, Node } from "@xyflow/react";
 import { invoke } from '@tauri-apps/api/core';
 import { projectManager } from "@/shared/services/project-manager.service";
 import { ParameterWithReference, NodeReference } from "../types/node-connection.types";
@@ -24,11 +24,6 @@ class DagService {
 
   private indgreeMap = new Map<string, number>();
   private nextNodeQueue: string[] = [];
-
-  private resultFlows: {
-    id: string;
-    indgree: number;
-  }[] = [];
 
   private graphNodeData: Node<any>[] = [];
   private graphEdgeData: Edge[] = [
@@ -111,8 +106,8 @@ class DagService {
   
         // 현재 노드에서 나가는 모든 엣지의 target(다음 노드) 검사
         const nextNodeIds = edges
-          .filter(edge => edge.source === nodeId)
-          .map(edge => edge.target);
+          .filter((edge: Edge) => edge.source === nodeId)
+          .map((edge: Edge) => edge.target);
   
         for (const nextId of nextNodeIds) {
           if (!visited.has(nextId) && hasCycle(nextId, edges)) {
@@ -472,7 +467,7 @@ class DagService {
     for(const frontNode of frontNodes) {
       const node = this.graphNodeData.find(n => n.id === frontNode);
       if (node) {
-        node.data.requestProperties.forEach(param => {
+        node.data.requestProperties.forEach((param: Parameter) => {
           parameters.push({
             ...param,
             nodeName: node.data.fileName,
@@ -492,7 +487,7 @@ class DagService {
       return [];
     }
     const parameters: Parameter[] = [];
-    node.data.requestProperties.forEach((param, index) => {
+    node.data.requestProperties.forEach((param: Parameter, index: number) => {
           parameters.push({
             id: `${nodeId}-param-${index}`,
             enabled: true,
@@ -569,7 +564,7 @@ class DagService {
     console.log(`[resolveNodeParameters] Request properties:`, node.data.requestProperties);
 
     // 노드의 파라미터들을 ParameterWithReference 형태로 변환
-    const parametersWithRef: ParameterWithReference[] = node.data.requestProperties.map((param, index) => ({
+    const parametersWithRef: ParameterWithReference[] = node.data.requestProperties.map((param: Parameter, index: number) => ({
       id: `${nodeId}-param-${index}`,
       key: param.key,
       value: param.value,
@@ -604,7 +599,7 @@ class DagService {
       return;
     }
 
-    const param = node.data.requestProperties.find(p => p.key === parameterKey);
+    const param = node.data.requestProperties.find((p: Parameter) => p.key === parameterKey);
     if (!param) {
       console.error(`Parameter with key ${parameterKey} not found in node ${nodeId}.`);
       return;
