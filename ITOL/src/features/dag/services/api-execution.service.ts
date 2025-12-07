@@ -2,6 +2,44 @@ import type { ApiNodeData } from "@/shared/components/settings-modal/types";
 import { useNodeStore } from "@/shared/store/use-node-store";
 import { useLogStore } from "@/shared/store/use-log-store";
 import { invoke } from '@tauri-apps/api/core';
+import { extractValueFromPath } from '../utils/node-reference.utils';
+
+/**
+ * {{nodeId.field}} 형식의 참조를 실제 값으로 치환합니다.
+ */
+function resolveReferences(value: string): string {
+  if (!value) return value;
+  
+  const referencePattern = /\{\{([^}]+)\}\}/g;
+  const nodeResults = useNodeStore.getState().nodeResults;
+  
+  return value.replace(referencePattern, (match, reference) => {
+    const parts = reference.split('.');
+    if (parts.length < 2) return match;
+    
+    const nodeId = parts[0];
+    const path = parts.slice(1).join('.');
+    
+    const nodeResult = nodeResults[nodeId];
+    if (!nodeResult || nodeResult.status !== 'success') {
+      console.warn(`[resolveReferences] Node ${nodeId} has not been executed successfully`);
+      return match;
+    }
+    
+    const extractedValue = extractValueFromPath(nodeResult, path);
+    if (extractedValue === null || extractedValue === undefined) {
+      console.warn(`[resolveReferences] Could not extract value from path: ${path}`);
+      return match;
+    }
+    
+    // 객체나 배열인 경우 JSON 문자열로 변환
+    if (typeof extractedValue === 'object') {
+      return JSON.stringify(extractedValue);
+    }
+    
+    return String(extractedValue);
+  });
+}
 
 /**
  * API 노드를 실행하는 서비스
@@ -34,58 +72,62 @@ export class ApiExecutionService {
     });
 
     try {
+      // Resolve references in URL
+      let finalUrl = resolveReferences(data.url);
+      
       // Replace path parameters in URL (e.g., {petId} -> 123)
-      let finalUrl = data.url;
       if (data.pathParams && data.pathParams.length > 0) {
         data.pathParams
           .filter(param => param.enabled && param.value)
           .forEach(param => {
-            finalUrl = finalUrl.replace(`{${param.key}}`, encodeURIComponent(param.value));
+            const resolvedValue = resolveReferences(param.value);
+            finalUrl = finalUrl.replace(`{${param.key}}`, encodeURIComponent(resolvedValue));
           });
       }
 
-      // Build URL with query parameters
+      // Build URL with query parameters (with reference resolution)
       const url = new URL(finalUrl);
       const queryParams: Record<string, string> = {};
       data.queryParams
         .filter(param => param.enabled)
         .forEach(param => {
-          queryParams[param.key] = param.value;
-          url.searchParams.append(param.key, param.value);
+          const resolvedValue = resolveReferences(param.value);
+          queryParams[param.key] = resolvedValue;
+          url.searchParams.append(param.key, resolvedValue);
         });
 
-      // Build headers
+      // Build headers (with reference resolution)
       const headers: Record<string, string> = {};
       data.headers
         .filter(header => header.enabled)
         .forEach(header => {
-          headers[header.key] = header.value;
+          headers[header.key] = resolveReferences(header.value);
         });
 
-      // Build authentication
+      // Build authentication (with reference resolution)
       const auth: Record<string, string> = { type: data.auth.type };
       if (data.auth.type === 'bearer' && data.auth.token) {
-        auth.token = data.auth.token;
+        auth.token = resolveReferences(data.auth.token);
       } else if (data.auth.type === 'basic' && data.auth.username && data.auth.password) {
-        auth.username = data.auth.username;
-        auth.password = data.auth.password;
+        auth.username = resolveReferences(data.auth.username);
+        auth.password = resolveReferences(data.auth.password);
       } else if (data.auth.type === 'api-key' && data.auth.apiKey && data.auth.apiKeyHeader) {
-        headers[data.auth.apiKeyHeader] = data.auth.apiKey;
+        headers[data.auth.apiKeyHeader] = resolveReferences(data.auth.apiKey);
       }
 
-      // Build request body
+      // Build request body (with reference resolution)
       let body: string | undefined;
       if (data.body.type === 'json' && data.body.raw) {
         headers['Content-Type'] = 'application/json';
-        body = data.body.raw;
+        body = resolveReferences(data.body.raw);
       } else if (data.body.type === 'raw' && data.body.raw) {
-        body = data.body.raw;
+        body = resolveReferences(data.body.raw);
       } else if (data.body.type === 'x-www-form-urlencoded' && data.body.urlEncoded) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
         const params = new URLSearchParams();
         data.body.urlEncoded
           .filter(item => item.enabled)
-          .forEach(item => params.append(item.key, item.value));
+          .forEach(item => params.append(item.key, resolveReferences(item.value)));
         body = params.toString();
       } else if (data.body.type === 'form-data' && data.body.formData) {
         // Form-data는 문자열로 직렬화

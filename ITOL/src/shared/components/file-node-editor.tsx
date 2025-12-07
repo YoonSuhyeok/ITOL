@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -29,6 +29,15 @@ export const FileNodeEditor: React.FC<FileNodeEditorProps> = ({
   mode,
 }) => {
   const [data, setData] = useState<FileNodeData>(initialData || defaultFileNodeData);
+
+  // initialData가 변경되면 data state를 업데이트
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+    } else {
+      setData(defaultFileNodeData);
+    }
+  }, [initialData]);
 
   const handleSave = () => {
     onSave(data);

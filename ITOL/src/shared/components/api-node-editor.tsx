@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,8 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { Plus, Trash2, Eye, EyeOff, Wand2, FileJson } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Wand2, FileJson, Unlink, ChevronsUpDown, Check } from 'lucide-react';
 import { SwaggerImport } from './swagger-import';
+import { Popover, PopoverContent, PopoverTrigger } from '@radix-ui/react-popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '../lib/utils';
+import { DagServiceInstance } from '@/features/dag/services/dag.service';
+import { useNodeStore } from '@/shared/store/use-node-store';
 import type { 
   ApiNodeData, 
   HttpMethod, 
@@ -24,6 +29,7 @@ interface ApiNodeEditorProps {
   initialData?: ApiNodeData;
   onSave: (data: ApiNodeData) => void;
   mode: 'create' | 'edit';
+  nodeId?: string;  // 이전 노드 참조를 위한 현재 노드 ID
 }
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -67,10 +73,34 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
   initialData,
   onSave,
   mode,
+  nodeId,
 }) => {
   const [data, setData] = useState<ApiNodeData>(initialData || defaultApiNodeData);
   const [showPassword, setShowPassword] = useState(false);
   const [showSwaggerImport, setShowSwaggerImport] = useState(false);
+  const [openReferencePopover, setOpenReferencePopover] = useState<string | null>(null);
+  
+  const { nodeResults } = useNodeStore();
+
+  // 사용 가능한 이전 노드 참조 목록 가져오기
+  const availableReferences = useMemo(() => {
+    if (!nodeId) return [];
+    try {
+      return DagServiceInstance.getAvailableReferencesExtended(nodeId, true);
+    } catch (e) {
+      console.error('Failed to get available references:', e);
+      return [];
+    }
+  }, [nodeId, nodeResults]);
+
+  // initialData가 변경되면 data state를 업데이트
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+    } else {
+      setData(defaultApiNodeData);
+    }
+  }, [initialData]);
 
   const updateData = <K extends keyof ApiNodeData>(key: K, value: ApiNodeData[K]) => {
     setData(prev => ({ ...prev, [key]: value }));
@@ -81,6 +111,9 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
     setData(prev => ({
       ...prev,
       ...importedData,
+      // Swagger 스키마 정보 포함
+      swaggerSpec: importedData.swaggerSpec,
+      swaggerOperationId: importedData.swaggerOperationId,
     }));
     setShowSwaggerImport(false);
   };
@@ -140,7 +173,7 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>
@@ -231,32 +264,84 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
                       Variables in URL like {'{petId}'}
                     </span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {data.pathParams.map((param, index) => (
-                      <div key={index} className="flex gap-2 items-center">
-                        <Switch
-                          checked={param.enabled}
-                          onCheckedChange={(checked) => updateKeyValuePair('pathParams', index, 'enabled', checked)}
-                        />
-                        <Input
-                          placeholder="Key"
-                          value={param.key}
-                          onChange={(e) => updateKeyValuePair('pathParams', index, 'key', e.target.value)}
-                          className="flex-1"
-                          disabled
-                        />
-                        <Input
-                          placeholder="Value"
-                          value={param.value}
-                          onChange={(e) => updateKeyValuePair('pathParams', index, 'value', e.target.value)}
-                          className="flex-1"
-                        />
-                        <Input
-                          placeholder="Description"
-                          value={param.description || ''}
-                          onChange={(e) => updateKeyValuePair('pathParams', index, 'description', e.target.value)}
-                          className="flex-1"
-                        />
+                      <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Switch
+                            checked={param.enabled}
+                            onCheckedChange={(checked) => updateKeyValuePair('pathParams', index, 'enabled', checked)}
+                          />
+                          <Label className="font-mono text-sm">{param.key}</Label>
+                          <Badge variant="outline" className="ml-auto">Path Parameter</Badge>
+                        </div>
+                        {/* Value with Reference Selector */}
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Value"
+                            value={param.value}
+                            onChange={(e) => updateKeyValuePair('pathParams', index, 'value', e.target.value)}
+                            className={cn(
+                              "flex-1",
+                              param.value?.startsWith('{{') && param.value?.endsWith('}}') && "bg-blue-50 border-blue-300"
+                            )}
+                          />
+                          {nodeId && availableReferences.length > 0 && (
+                            <Popover
+                              open={openReferencePopover === `path-${index}`}
+                              onOpenChange={(open) => setOpenReferencePopover(open ? `path-${index}` : null)}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-9 w-9 p-0" title="Select from previous node">
+                                  <ChevronsUpDown className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[350px] p-0 z-50 bg-white border rounded-md shadow-lg" align="end">
+                                <Command>
+                                  <CommandInput placeholder="Search previous node results..." />
+                                  <CommandList>
+                                    <CommandEmpty>No results found.</CommandEmpty>
+                                    <CommandGroup heading="Previous Node Results">
+                                      {availableReferences.map((ref) => (
+                                        <CommandItem
+                                          key={`${ref.nodeId}-${ref.field}`}
+                                          value={ref.displayPath}
+                                          onSelect={() => {
+                                            updateKeyValuePair('pathParams', index, 'value', `{{${ref.nodeId}.${ref.field}}}`);
+                                            setOpenReferencePopover(null);
+                                          }}
+                                          className="cursor-pointer"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              param.value === `{{${ref.nodeId}.${ref.field}}}` ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          <span className="truncate">{ref.displayPath}</span>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                          {param.value?.startsWith('{{') && param.value?.endsWith('}}') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-9 w-9 p-0 text-gray-500 hover:text-red-500"
+                              onClick={() => updateKeyValuePair('pathParams', index, 'value', '')}
+                              title="Clear reference"
+                            >
+                              <Unlink className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        {param.description && (
+                          <p className="text-xs text-muted-foreground mt-2">{param.description}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -285,12 +370,70 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
                       onChange={(e) => updateKeyValuePair('queryParams', index, 'key', e.target.value)}
                       className="flex-1"
                     />
-                    <Input
-                      placeholder="Value"
-                      value={param.value}
-                      onChange={(e) => updateKeyValuePair('queryParams', index, 'value', e.target.value)}
-                      className="flex-1"
-                    />
+                    {/* Value with Reference Selector */}
+                    <div className="flex-1 flex gap-1">
+                      <Input
+                        placeholder="Value"
+                        value={param.value}
+                        onChange={(e) => updateKeyValuePair('queryParams', index, 'value', e.target.value)}
+                        className={cn(
+                          "flex-1",
+                          param.value?.startsWith('{{') && param.value?.endsWith('}}') && "bg-blue-50 border-blue-300"
+                        )}
+                      />
+                      {nodeId && availableReferences.length > 0 && (
+                        <Popover
+                          open={openReferencePopover === `query-${index}`}
+                          onOpenChange={(open) => setOpenReferencePopover(open ? `query-${index}` : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 w-9 p-0" title="Select from previous node">
+                              <ChevronsUpDown className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[350px] p-0 z-50 bg-white border rounded-md shadow-lg" align="end">
+                            <Command>
+                              <CommandInput placeholder="Search previous node results..." />
+                              <CommandList>
+                                <CommandEmpty>No results found.</CommandEmpty>
+                                <CommandGroup heading="Previous Node Results">
+                                  {availableReferences.map((ref) => (
+                                    <CommandItem
+                                      key={`${ref.nodeId}-${ref.field}`}
+                                      value={ref.displayPath}
+                                      onSelect={() => {
+                                        updateKeyValuePair('queryParams', index, 'value', `{{${ref.nodeId}.${ref.field}}}`);
+                                        setOpenReferencePopover(null);
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          param.value === `{{${ref.nodeId}.${ref.field}}}` ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="truncate">{ref.displayPath}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                      {param.value?.startsWith('{{') && param.value?.endsWith('}}') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-gray-500 hover:text-red-500"
+                          onClick={() => updateKeyValuePair('queryParams', index, 'value', '')}
+                          title="Clear reference"
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       placeholder="Description"
                       value={param.description || ''}
@@ -456,12 +599,70 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
                       onChange={(e) => updateKeyValuePair('headers', index, 'key', e.target.value)}
                       className="flex-1"
                     />
-                    <Input
-                      placeholder="Value"
-                      value={header.value}
-                      onChange={(e) => updateKeyValuePair('headers', index, 'value', e.target.value)}
-                      className="flex-1"
-                    />
+                    {/* Value with Reference Selector */}
+                    <div className="flex-1 flex gap-1">
+                      <Input
+                        placeholder="Value"
+                        value={header.value}
+                        onChange={(e) => updateKeyValuePair('headers', index, 'value', e.target.value)}
+                        className={cn(
+                          "flex-1",
+                          header.value?.startsWith('{{') && header.value?.endsWith('}}') && "bg-blue-50 border-blue-300"
+                        )}
+                      />
+                      {nodeId && availableReferences.length > 0 && (
+                        <Popover
+                          open={openReferencePopover === `header-${index}`}
+                          onOpenChange={(open) => setOpenReferencePopover(open ? `header-${index}` : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 w-9 p-0" title="Select from previous node">
+                              <ChevronsUpDown className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[350px] p-0 z-50 bg-white border rounded-md shadow-lg" align="end">
+                            <Command>
+                              <CommandInput placeholder="Search previous node results..." />
+                              <CommandList>
+                                <CommandEmpty>No results found.</CommandEmpty>
+                                <CommandGroup heading="Previous Node Results">
+                                  {availableReferences.map((ref) => (
+                                    <CommandItem
+                                      key={`${ref.nodeId}-${ref.field}`}
+                                      value={ref.displayPath}
+                                      onSelect={() => {
+                                        updateKeyValuePair('headers', index, 'value', `{{${ref.nodeId}.${ref.field}}}`);
+                                        setOpenReferencePopover(null);
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          header.value === `{{${ref.nodeId}.${ref.field}}}` ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="truncate">{ref.displayPath}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                      {header.value?.startsWith('{{') && header.value?.endsWith('}}') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-gray-500 hover:text-red-500"
+                          onClick={() => updateKeyValuePair('headers', index, 'value', '')}
+                          title="Clear reference"
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       placeholder="Description"
                       value={header.description || ''}

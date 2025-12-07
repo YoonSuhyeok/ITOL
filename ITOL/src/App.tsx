@@ -1119,6 +1119,7 @@ function FlowCanvas() {
 				initialData={editingApiNode?.data}
 				onSave={handleApiEditorSave}
 				mode={editingApiNode ? 'edit' : 'create'}
+				nodeId={editingApiNode?.nodeId}
 			/>
 			<DbNodeEditor
 				isOpen={dbEditorOpen}
@@ -1126,6 +1127,7 @@ function FlowCanvas() {
 				initialData={editingDbNode?.data}
 				onSave={handleDbEditorSave}
 				mode={editingDbNode ? 'edit' : 'create'}
+				nodeId={editingDbNode?.nodeId}
 			/>
 			<NodeCreationDialog
 				isOpen={nodeCreationDialogOpen}

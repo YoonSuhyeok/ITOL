@@ -216,6 +216,10 @@ export interface ApiNodeData {
   
   // Response handling
   followRedirects?: boolean;
+  
+  // Swagger/OpenAPI schema information (if imported from Swagger)
+  swaggerSpec?: unknown; // The OpenAPI/Swagger spec object
+  swaggerOperationId?: string; // The operation ID from Swagger spec
 }
 
 export interface SettingsModalProps {

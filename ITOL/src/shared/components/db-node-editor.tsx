@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,7 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { Database, Play, Save, FolderOpen, Plus, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { Database, Play, Save, FolderOpen, Plus, Trash2, CheckCircle2, XCircle, Check, GitBranch } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@radix-ui/react-popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '../lib/utils';
+import { DagServiceInstance } from '@/features/dag/services/dag.service';
+import { useNodeStore } from '@/shared/store/use-node-store';
 import type { 
   DbNodeData, 
   DatabaseType, 
@@ -29,6 +34,7 @@ interface DbNodeEditorProps {
   initialData?: DbNodeData;
   onSave: (data: DbNodeData) => void;
   mode: 'create' | 'edit';
+  nodeId?: string;  // 이전 노드 참조를 위한 현재 노드 ID
 }
 
 const DATABASE_TYPES: { value: DatabaseType; label: string }[] = [
@@ -57,10 +63,25 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
   initialData,
   onSave,
   mode,
+  nodeId,
 }) => {
   const [data, setData] = useState<DbNodeData>(initialData || defaultDbNodeData);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionTestResult, setConnectionTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [openReferencePopover, setOpenReferencePopover] = useState<string | null>(null);
+  
+  const { nodeResults } = useNodeStore();
+
+  // 사용 가능한 이전 노드 참조 목록 가져오기
+  const availableReferences = useMemo(() => {
+    if (!nodeId) return [];
+    try {
+      return DagServiceInstance.getAvailableReferencesExtended(nodeId, true);
+    } catch (e) {
+      console.error('Failed to get available references:', e);
+      return [];
+    }
+  }, [nodeId, nodeResults]);
   
   // Query save/load state
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -77,6 +98,15 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
 
   // Oracle installer state
   const [showOracleInstaller, setShowOracleInstaller] = useState(false);
+
+  // initialData가 변경되면 data state를 업데이트
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+    } else {
+      setData(defaultDbNodeData);
+    }
+  }, [initialData]);
 
   // Load saved queries when load dialog opens
   useEffect(() => {
@@ -531,6 +561,47 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
                 <div className="flex justify-between items-center mb-2">
                   <Label>SQL Query</Label>
                   <div className="flex gap-2">
+                    {/* Insert Reference Button */}
+                    {nodeId && availableReferences.length > 0 && (
+                      <Popover
+                        open={openReferencePopover === 'query'}
+                        onOpenChange={(open) => setOpenReferencePopover(open ? 'query' : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button size="sm" variant="outline" title="Insert reference from previous node">
+                            <GitBranch className="h-4 w-4 mr-1" />
+                            Insert Reference
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[350px] p-0 z-50 bg-white border rounded-md shadow-lg" align="end">
+                          <Command>
+                            <CommandInput placeholder="Search previous node results..." />
+                            <CommandList>
+                              <CommandEmpty>No results found.</CommandEmpty>
+                              <CommandGroup heading="Previous Node Results">
+                                {availableReferences.map((ref) => (
+                                  <CommandItem
+                                    key={`${ref.nodeId}-${ref.field}`}
+                                    value={ref.displayPath}
+                                    onSelect={() => {
+                                      const refValue = `{{${ref.nodeId}.${ref.field}}}`;
+                                      updateData('query', data.query + refValue);
+                                      setOpenReferencePopover(null);
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <Check
+                                      className={cn("mr-2 h-4 w-4 opacity-0")}
+                                    />
+                                    <span className="truncate">{ref.displayPath}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -556,6 +627,12 @@ export const DbNodeEditor: React.FC<DbNodeEditorProps> = ({
                   placeholder="SELECT * FROM table_name WHERE condition"
                   className="font-mono text-sm"
                 />
+                {/* Reference Hint */}
+                {nodeId && availableReferences.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 You can use <code className="bg-muted px-1 rounded">{"{{nodeId.result.field}}"}</code> to reference values from previous nodes.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

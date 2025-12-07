@@ -2,6 +2,44 @@ import type { DbNodeData } from "@/shared/components/settings-modal/types";
 import { useNodeStore } from "@/shared/store/use-node-store";
 import { useLogStore } from "@/shared/store/use-log-store";
 import { invoke } from '@tauri-apps/api/core';
+import { extractValueFromPath } from '../utils/node-reference.utils';
+
+/**
+ * {{nodeId.field}} 형식의 참조를 실제 값으로 치환합니다.
+ */
+function resolveReferences(value: string): string {
+  if (!value) return value;
+  
+  const referencePattern = /\{\{([^}]+)\}\}/g;
+  const nodeResults = useNodeStore.getState().nodeResults;
+  
+  return value.replace(referencePattern, (match, reference) => {
+    const parts = reference.split('.');
+    if (parts.length < 2) return match;
+    
+    const nodeId = parts[0];
+    const path = parts.slice(1).join('.');
+    
+    const nodeResult = nodeResults[nodeId];
+    if (!nodeResult || nodeResult.status !== 'success') {
+      console.warn(`[resolveReferences] Node ${nodeId} has not been executed successfully`);
+      return match;
+    }
+    
+    const extractedValue = extractValueFromPath(nodeResult, path);
+    if (extractedValue === null || extractedValue === undefined) {
+      console.warn(`[resolveReferences] Could not extract value from path: ${path}`);
+      return match;
+    }
+    
+    // 객체나 배열인 경우 JSON 문자열로 변환
+    if (typeof extractedValue === 'object') {
+      return JSON.stringify(extractedValue);
+    }
+    
+    return String(extractedValue);
+  });
+}
 
 /**
  * DB 노드를 실행하는 서비스
@@ -34,7 +72,10 @@ export class DbExecutionService {
     });
 
     try {
-      if (!data.query || data.query.trim() === '') {
+      // Resolve references in query
+      const resolvedQuery = resolveReferences(data.query);
+      
+      if (!resolvedQuery || resolvedQuery.trim() === '') {
         throw new Error('Query is empty');
       }
 
@@ -50,7 +91,7 @@ export class DbExecutionService {
       const responseText = await invoke<string>('execute_db_command', {
         params: {
           connection: data.connection,
-          query: data.query,
+          query: resolvedQuery,
           timeout: data.timeout ? Math.floor(data.timeout / 1000) : 30,
           max_rows: data.maxRows || 1000,
           project_id: null,

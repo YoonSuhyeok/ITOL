@@ -2,6 +2,98 @@ import { useNodeStore } from "@/shared/store/use-node-store";
 import { NodeReference, ParameterWithReference } from "../types/node-connection.types";
 
 /**
+ * Swagger/OpenAPI 스키마에서 필드 목록을 추출하는 함수
+ */
+function extractFieldsFromSchema(schema: any, prefix: string = ''): string[] {
+  const fields: string[] = [];
+  
+  if (!schema) return fields;
+  
+  // $ref 참조 해결은 간단히 생략 (실제로는 spec 전체를 받아서 해결해야 함)
+  if (schema.$ref) {
+    // $ref 참조는 여기서는 처리하지 않음
+    return fields;
+  }
+  
+  // 객체 타입인 경우
+  if (schema.type === 'object' && schema.properties) {
+    for (const [key, propSchema] of Object.entries(schema.properties)) {
+      const fieldPath = prefix ? `${prefix}.${key}` : key;
+      fields.push(fieldPath);
+      
+      // 중첩된 객체는 재귀적으로 처리 (깊이 제한 3)
+      if (prefix.split('.').length < 3) {
+        const nestedFields = extractFieldsFromSchema(propSchema as any, fieldPath);
+        fields.push(...nestedFields);
+      }
+    }
+  }
+  
+  // 배열 타입인 경우
+  if (schema.type === 'array' && schema.items) {
+    const arrayItemPath = prefix ? `${prefix}[0]` : '[0]';
+    const itemFields = extractFieldsFromSchema(schema.items, arrayItemPath);
+    fields.push(...itemFields);
+  }
+  
+  return fields;
+}
+
+/**
+ * Swagger spec에서 특정 operation의 응답 스키마 필드들을 추출
+ */
+export function getSchemaFieldsFromSwagger(
+  swaggerSpec: any,
+  operationId: string
+): string[] {
+  if (!swaggerSpec || !operationId) return [];
+  
+  try {
+    // OpenAPI 3.0 형식
+    if (swaggerSpec.openapi) {
+      for (const [path, pathItem] of Object.entries(swaggerSpec.paths || {})) {
+        for (const [method, operation] of Object.entries(pathItem as any)) {
+          if (typeof operation === 'object' && operation.operationId === operationId) {
+            // 200 응답 스키마 찾기
+            const responses = operation.responses || {};
+            const successResponse = responses['200'] || responses['201'] || responses['default'];
+            
+            if (successResponse) {
+              const content = successResponse.content || {};
+              const jsonContent = content['application/json'] || content['*/*'];
+              
+              if (jsonContent && jsonContent.schema) {
+                return extractFieldsFromSchema(jsonContent.schema);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Swagger 2.0 형식
+    if (swaggerSpec.swagger === '2.0') {
+      for (const [path, pathItem] of Object.entries(swaggerSpec.paths || {})) {
+        for (const [method, operation] of Object.entries(pathItem as any)) {
+          if (typeof operation === 'object' && operation.operationId === operationId) {
+            const responses = operation.responses || {};
+            const successResponse = responses['200'] || responses['201'] || responses['default'];
+            
+            if (successResponse && successResponse.schema) {
+              return extractFieldsFromSchema(successResponse.schema);
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[getSchemaFieldsFromSwagger] Error parsing swagger spec:', error);
+  }
+  
+  return [];
+}
+
+/**
  * JSON path를 사용하여 객체에서 값을 추출하는 유틸리티
  */
 export function extractValueFromPath(obj: any, path: string): any {
@@ -273,17 +365,36 @@ export function getAvailableNodeReferencesExtended(
       
       references.push({
         nodeId: sourceNodeId,
-        nodeName: sourceNode.data?.fileName || sourceNode.id,
+        nodeName: sourceNode.data?.fileName || sourceNode.data?.name || sourceNode.id,
         field: 'result',
-        displayPath: `${sourceNode.data?.fileName || sourceNode.id} → result${displaySuffix}`
+        displayPath: `${sourceNode.data?.fileName || sourceNode.data?.name || sourceNode.id} → result${displaySuffix}`
       });
       
+      // API 노드이고 Swagger 스키마가 있는 경우, 스키마 기반으로 필드 추가
+      if (sourceNode.data?.type === 'api' && sourceNode.data?.swaggerSpec && sourceNode.data?.swaggerOperationId) {
+        console.log(`[getAvailableNodeReferencesExtended] API node with Swagger schema found:`, sourceNodeId);
+        const schemaFields = getSchemaFieldsFromSwagger(
+          sourceNode.data.swaggerSpec,
+          sourceNode.data.swaggerOperationId
+        );
+        
+        console.log(`[getAvailableNodeReferencesExtended] Schema fields:`, schemaFields);
+        
+        for (const field of schemaFields) {
+          references.push({
+            nodeId: sourceNodeId,
+            nodeName: sourceNode.data?.name || sourceNode.id,
+            field: `result.${field}`,
+            displayPath: `${sourceNode.data?.name || sourceNode.id} → result.${field} (schema)`
+          });
+        }
+      }
       // 결과가 객체인 경우에만 각 필드에 대한 참조 추가 (성공한 경우만)
-      if (nodeResult && nodeResult.status === 'success' && nodeResult.result && typeof nodeResult.result === 'object') {
+      else if (nodeResult && nodeResult.status === 'success' && nodeResult.result && typeof nodeResult.result === 'object') {
         addObjectFieldReferences(
           references, 
           sourceNodeId, 
-          sourceNode.data?.fileName || sourceNode.id,
+          sourceNode.data?.fileName || sourceNode.data?.name || sourceNode.id,
           nodeResult.result, 
           'result'
         );

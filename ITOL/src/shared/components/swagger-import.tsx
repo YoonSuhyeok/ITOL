@@ -202,6 +202,9 @@ export const SwaggerImport: React.FC<SwaggerImportProps> = ({ onImport, onClose 
       ...apiData,
       timeout: 30000,
       followRedirects: true,
+      // Swagger 스키마 정보 추가
+      swaggerSpec: currentSpec,
+      swaggerOperationId: selectedEndpoint.operationId,
     });
     onClose();
   };
