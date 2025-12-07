@@ -34,8 +34,18 @@ export class ApiExecutionService {
     });
 
     try {
+      // Replace path parameters in URL (e.g., {petId} -> 123)
+      let finalUrl = data.url;
+      if (data.pathParams && data.pathParams.length > 0) {
+        data.pathParams
+          .filter(param => param.enabled && param.value)
+          .forEach(param => {
+            finalUrl = finalUrl.replace(`{${param.key}}`, encodeURIComponent(param.value));
+          });
+      }
+
       // Build URL with query parameters
-      const url = new URL(data.url);
+      const url = new URL(finalUrl);
       const queryParams: Record<string, string> = {};
       data.queryParams
         .filter(param => param.enabled)

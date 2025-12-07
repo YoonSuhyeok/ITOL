@@ -1,7 +1,7 @@
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
-import { Handle, Position, Node } from "@xyflow/react";
-import { Globe, Play, Settings, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Handle, Position, Node, useReactFlow } from "@xyflow/react";
+import { Globe, Play, Settings, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
 import type { ApiNodeData, HttpMethod } from "@/shared/components/settings-modal/types";
@@ -29,9 +29,10 @@ const getMethodColor = (method: HttpMethod): string => {
 };
 
 function ApiNode(props: ApiNodeProps) {
-  const { data, id } = props;
+  const { data, id, setNodes, setEdges } = props;
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { nodeResults } = useNodeStore();
+  const { nodeResults, removeNodeResult } = useNodeStore();
+  const { deleteElements } = useReactFlow();
   
   const currentResult = nodeResults[id];
   const isRunning = currentResult?.status === 'running';
@@ -40,6 +41,15 @@ function ApiNode(props: ApiNodeProps) {
   const handleRun = async () => {
     // DAG 서비스를 통해 실행하여 순차 실행 로직을 사용
     await DagServiceInstance.runNode(id);
+  };
+
+  const handleDelete = () => {
+    // Remove from ReactFlow
+    deleteElements({ nodes: [{ id }] });
+    // Remove from DagService
+    DagServiceInstance.removeNode(id);
+    // Remove result from store
+    removeNodeResult(id);
   };
 
   const getStatusIcon = () => {
@@ -75,14 +85,28 @@ function ApiNode(props: ApiNodeProps) {
             </span>
             {getStatusIcon()}
           </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              title="Delete node"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         {/* Method and URL */}

@@ -1,7 +1,7 @@
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/utils";
-import { Handle, Position, Node } from "@xyflow/react";
-import { Database, Play, Settings, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Handle, Position, Node, useReactFlow } from "@xyflow/react";
+import { Database, Play, Settings, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/shared/components/ui/badge";
 import type { DbNodeData, DatabaseType } from "@/shared/components/settings-modal/types";
@@ -36,7 +36,8 @@ const getDatabaseIcon = (type: DatabaseType): string => {
 function DbNode(props: DbNodeProps) {
   const { data, id } = props;
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { nodeResults } = useNodeStore();
+  const { nodeResults, removeNodeResult } = useNodeStore();
+  const { deleteElements } = useReactFlow();
   
   const currentResult = nodeResults[id];
   const isRunning = currentResult?.status === 'running';
@@ -45,6 +46,12 @@ function DbNode(props: DbNodeProps) {
   const handleRun = async () => {
     // DAG 서비스를 통해 실행하여 순차 실행 로직을 사용
     await DagServiceInstance.runNode(id);
+  };
+
+  const handleDelete = () => {
+    deleteElements({ nodes: [{ id }] });
+    DagServiceInstance.removeNode(id);
+    removeNodeResult(id);
   };
 
   const getConnectionString = () => {
@@ -102,14 +109,28 @@ function DbNode(props: DbNodeProps) {
             </div>
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-1 h-6 w-6"
-        >
-          {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="p-1 h-6 w-6 hover:bg-red-100 hover:text-red-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
+            title="Delete node"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1 h-6 w-6"
+          >
+            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* Body */}

@@ -192,6 +192,9 @@ export interface ApiNodeData {
   method: HttpMethod;
   url: string;
   
+  // Path parameters (e.g., {petId} in /pet/{petId})
+  pathParams: KeyValuePair[];
+  
   // Query parameters
   queryParams: KeyValuePair[];
   
@@ -236,4 +239,14 @@ export interface ProjectFormData {
   type: ProjectType;
   path: string;
   description: string;
+}
+
+// Saved Swagger/OpenAPI specifications
+export interface SavedSwagger {
+  id: string;
+  name: string;
+  url?: string; // URL if fetched from remote
+  spec: unknown; // The actual OpenAPI/Swagger JSON
+  createdAt: string;
+  updatedAt?: string;
 }

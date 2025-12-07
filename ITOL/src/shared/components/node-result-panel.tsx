@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, FileJson, Clock, CheckCircle2, XCircle, Terminal } from 'lucide-react';
+import { X, ChevronRight, FileJson, Clock, CheckCircle2, XCircle, Terminal, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useNodeStore } from '../store/use-node-store';
@@ -10,7 +10,7 @@ interface NodeResultPanelProps {
 }
 
 export const NodeResultPanel: React.FC<NodeResultPanelProps> = ({ collapsed, onToggleCollapse }) => {
-  const { nodeResults } = useNodeStore();
+  const { nodeResults, removeNodeResult, clearNodeResults } = useNodeStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Convert nodeResults object to array
@@ -83,6 +83,21 @@ export const NodeResultPanel: React.FC<NodeResultPanelProps> = ({ collapsed, onT
           </Badge>
         </div>
         <div className="flex items-center gap-1">
+          {resultsArray.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                clearNodeResults();
+                setSelectedNodeId(null);
+              }}
+              className="h-7 px-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+              title="Clear All Results"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              <span className="text-xs">Clear</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -106,18 +121,33 @@ export const NodeResultPanel: React.FC<NodeResultPanelProps> = ({ collapsed, onT
         ) : (
           <div className="p-2 space-y-2">
             {resultsArray.map((result) => (
-              <button
+              <div
                 key={result.nodeId}
-                onClick={() => setSelectedNodeId(result.nodeId)}
-                className={`w-full text-left p-3 rounded-lg border-l-4 transition-all ${getStatusColor(
+                className={`relative w-full text-left p-3 rounded-lg border-l-4 transition-all cursor-pointer ${getStatusColor(
                   result.status
                 )} ${
                   selectedNodeId === result.nodeId
                     ? 'ring-2 ring-blue-500 shadow-md'
                     : 'hover:shadow-sm'
                 }`}
+                onClick={() => setSelectedNodeId(result.nodeId)}
               >
-                <div className="flex items-start justify-between mb-2">
+                {/* Delete button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeNodeResult(result.nodeId);
+                    if (selectedNodeId === result.nodeId) {
+                      setSelectedNodeId(null);
+                    }
+                  }}
+                  className="absolute top-2 right-2 p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Remove this result"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+
+                <div className="flex items-start justify-between mb-2 pr-6">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(result.status)}
                     <span className="font-medium text-sm text-gray-800">
@@ -155,7 +185,7 @@ export const NodeResultPanel: React.FC<NodeResultPanelProps> = ({ collapsed, onT
                     📄 Output available
                   </div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
         )}

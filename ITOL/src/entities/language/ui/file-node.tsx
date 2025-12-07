@@ -15,6 +15,7 @@ import {
 	Hammer,
 	Play,
 	Save,
+	Trash2,
 	X,
 } from "lucide-react";
 import { useState } from "react";
@@ -75,7 +76,7 @@ function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 	const [requestType, setRequestType] = useState()
 	const [responseType, setResponseType] = useState()
 
-  const { nodeResults } = useNodeStore();
+  const { nodeResults, removeNodeResult } = useNodeStore();
   const isRunning = nodeResults[node.id]?.status === "running";
 	
   return (
@@ -237,10 +238,13 @@ function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 					<Button
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8"
+						className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
 						onClick={() => {
 							// DagService에서 노드 제거 (엣지도 함께 제거됨)
 							DagServiceInstance.removeNode(node.id);
+							
+							// 결과 패널에서 결과 제거
+							removeNodeResult(node.id);
 							
 							// React Flow 상태에서 노드 제거
 							setNodes((nds) => nds.filter((n) => n.id !== node.id));
@@ -257,8 +261,9 @@ function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 							
 							console.log(`Node ${node.id} removed successfully`);
 						}}
+						title="Delete node"
 					>
-						<X className="h-4 w-4" />
+						<Trash2 className="h-4 w-4" />
 					</Button>
 				</div>
 			</div>

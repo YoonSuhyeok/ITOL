@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { Plus, Trash2, Eye, EyeOff, Wand2 } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Wand2, FileJson } from 'lucide-react';
+import { SwaggerImport } from './swagger-import';
 import type { 
   ApiNodeData, 
   HttpMethod, 
@@ -49,6 +50,7 @@ const defaultApiNodeData: ApiNodeData = {
   description: '',
   method: 'GET',
   url: '',
+  pathParams: [],
   queryParams: [],
   headers: [],
   auth: { type: 'none' },
@@ -68,9 +70,19 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
 }) => {
   const [data, setData] = useState<ApiNodeData>(initialData || defaultApiNodeData);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSwaggerImport, setShowSwaggerImport] = useState(false);
 
   const updateData = <K extends keyof ApiNodeData>(key: K, value: ApiNodeData[K]) => {
     setData(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Import from Swagger
+  const handleSwaggerImport = (importedData: Partial<ApiNodeData>) => {
+    setData(prev => ({
+      ...prev,
+      ...importedData,
+    }));
+    setShowSwaggerImport(false);
   };
 
   // JSON Beautify function
@@ -88,13 +100,13 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
   };
 
   // Key-Value pair management
-  const addKeyValuePair = (type: 'queryParams' | 'headers') => {
+  const addKeyValuePair = (type: 'pathParams' | 'queryParams' | 'headers') => {
     const newPair: KeyValuePair = { key: '', value: '', enabled: true };
     updateData(type, [...data[type], newPair]);
   };
 
   const updateKeyValuePair = (
-    type: 'queryParams' | 'headers',
+    type: 'pathParams' | 'queryParams' | 'headers',
     index: number,
     field: keyof KeyValuePair,
     value: string | boolean
@@ -104,7 +116,7 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
     updateData(type, updated);
   };
 
-  const removeKeyValuePair = (type: 'queryParams' | 'headers', index: number) => {
+  const removeKeyValuePair = (type: 'pathParams' | 'queryParams' | 'headers', index: number) => {
     updateData(type, data[type].filter((_, i) => i !== index));
   };
 
@@ -130,11 +142,28 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {mode === 'create' ? 'Create API Node' : 'Edit API Node'}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>
+              {mode === 'create' ? 'Create API Node' : 'Edit API Node'}
+            </DialogTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSwaggerImport(!showSwaggerImport)}
+              className="flex items-center gap-2"
+            >
+              <FileJson className="h-4 w-4" />
+              {showSwaggerImport ? 'Manual Input' : 'Import from Swagger'}
+            </Button>
+          </div>
         </DialogHeader>
 
+        {showSwaggerImport ? (
+          <SwaggerImport
+            onImport={handleSwaggerImport}
+            onClose={() => setShowSwaggerImport(false)}
+          />
+        ) : (
         <div className="space-y-4">
           {/* Basic Info */}
           <div className="space-y-3">
@@ -192,7 +221,50 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
             </TabsList>
 
             {/* Query Parameters Tab */}
-            <TabsContent value="params" className="space-y-3">
+            <TabsContent value="params" className="space-y-4">
+              {/* Path Parameters Section */}
+              {data.pathParams.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label>Path Parameters</Label>
+                    <span className="text-xs text-muted-foreground">
+                      Variables in URL like {'{petId}'}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {data.pathParams.map((param, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <Switch
+                          checked={param.enabled}
+                          onCheckedChange={(checked) => updateKeyValuePair('pathParams', index, 'enabled', checked)}
+                        />
+                        <Input
+                          placeholder="Key"
+                          value={param.key}
+                          onChange={(e) => updateKeyValuePair('pathParams', index, 'key', e.target.value)}
+                          className="flex-1"
+                          disabled
+                        />
+                        <Input
+                          placeholder="Value"
+                          value={param.value}
+                          onChange={(e) => updateKeyValuePair('pathParams', index, 'value', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Input
+                          placeholder="Description"
+                          value={param.description || ''}
+                          onChange={(e) => updateKeyValuePair('pathParams', index, 'description', e.target.value)}
+                          className="flex-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-b pb-2" />
+                </div>
+              )}
+
+              {/* Query Parameters Section */}
               <div className="flex justify-between items-center">
                 <Label>Query Parameters</Label>
                 <Button size="sm" variant="outline" onClick={() => addKeyValuePair('queryParams')}>
@@ -613,6 +685,7 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
             </Button>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
