@@ -1,15 +1,19 @@
-import { Background, ReactFlow, useNodesState, useEdgesState, addEdge, MarkerType, Connection, useReactFlow, ReactFlowProvider } from "@xyflow/react";
+import { Background, ReactFlow, useNodesState, useEdgesState, addEdge, MarkerType, Connection, useReactFlow, ReactFlowProvider, Node } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 
 import "./App.css";
 import { DagServiceInstance } from "./features/dag/services/dag.service";
 import FileNode from "@/entities/language/ui/file-node";
-import { useCallback, useMemo } from "react";
+import ApiNode from "@/entities/api/ui/api-node";
+import { useCallback, useMemo, useState } from "react";
 import type FileNodeData from "@/entities/language/model/file-type";
 import WindowHeader from "./shared/components/window-header";
 import Toolbar from "./shared/components/toolbar";
 import { ExecutionLogPanel } from "./shared/components/execution-log-panel";
+import { NodeResultPanel } from "./shared/components/node-result-panel";
+import { ApiNodeEditor } from "./shared/components/api-node-editor";
+import type { ApiNodeData } from "./shared/components/settings-modal/types";
 
 export default function App() {
 	return (
@@ -25,6 +29,10 @@ function FlowCanvas() {
 	const [nodes, setNodes, onNodesChange] = useNodesState(DagServiceInstance.getNodeData());
 	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
 	const { screenToFlowPosition } = useReactFlow();
+
+	// API Node Editor state
+	const [apiEditorOpen, setApiEditorOpen] = useState(false);
+	const [editingApiNode, setEditingApiNode] = useState<{ nodeId: string; data: ApiNodeData } | null>(null);
 
 	// 새로운 노드 생성 함수
 	const createNewNode = useCallback((position: { x: number; y: number }, sourceNodeId?: string) => {
@@ -100,9 +108,65 @@ function FlowCanvas() {
 		return newNodeId;
 	}, [setNodes]);
 
+	// API 노드 생성 함수
+	const createApiNode = useCallback((apiData: ApiNodeData) => {
+		const newNodeId = `api-node-${Date.now()}`;
+		const newNode: any = {
+			id: newNodeId,
+			type: 'apiNode',
+			position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+			data: apiData
+		};
+		
+		setNodes((nds: any) => [...nds, newNode]);
+		DagServiceInstance.addNode(newNode as any);
+		
+		return newNodeId;
+	}, [setNodes]);
+
+	// API 노드 업데이트 함수
+	const updateApiNode = useCallback((nodeId: string, apiData: ApiNodeData) => {
+		setNodes((nds: any) => 
+			nds.map((node: any) => 
+				node.id === nodeId 
+					? { ...node, data: apiData }
+					: node
+			)
+		);
+		// DagService에도 업데이트 반영 필요 시 추가
+	}, [setNodes]);
+
+	// 노드 더블클릭 핸들러
+	const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
+		if (node.type === 'apiNode') {
+			setEditingApiNode({ nodeId: node.id, data: node.data as unknown as ApiNodeData });
+			setApiEditorOpen(true);
+		}
+	}, []);
+
+	// API Editor 저장 핸들러
+	const handleApiEditorSave = useCallback((data: ApiNodeData) => {
+		if (editingApiNode) {
+			// 편집 모드
+			updateApiNode(editingApiNode.nodeId, data);
+		} else {
+			// 생성 모드
+			createApiNode(data);
+		}
+		setApiEditorOpen(false);
+		setEditingApiNode(null);
+	}, [editingApiNode, updateApiNode, createApiNode]);
+
+	// API Editor 닫기 핸들러
+	const handleApiEditorClose = useCallback(() => {
+		setApiEditorOpen(false);
+		setEditingApiNode(null);
+	}, []);
+
 	const nodeTypes = useMemo(
 		() => ({
-			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
+			languageNode: (nodeProps: any) => <FileNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />,
+			apiNode: (nodeProps: any) => <ApiNode {...nodeProps} setNodes={setNodes} setEdges={setEdges} />
 		}),
 		[setNodes, setEdges]
 	);
@@ -176,13 +240,28 @@ function FlowCanvas() {
 						onEdgesChange={onEdgesChange}
 						onConnect={onConnect}
 						onConnectEnd={onConnectEnd}
+						onNodeDoubleClick={onNodeDoubleClick}
 					>
 						<Background />
 					</ReactFlow>
+					<NodeResultPanel />
 				</div>
 				<ExecutionLogPanel />
 			</div>
-			<Toolbar onCreateFileNode={createFileNode} />
+			<Toolbar 
+				onCreateFileNode={createFileNode}
+				onCreateApiNode={() => {
+					setEditingApiNode(null);
+					setApiEditorOpen(true);
+				}}
+			/>
+			<ApiNodeEditor
+				isOpen={apiEditorOpen}
+				onClose={handleApiEditorClose}
+				initialData={editingApiNode?.data}
+				onSave={handleApiEditorSave}
+				mode={editingApiNode ? 'edit' : 'create'}
+			/>
 		</div>
 	);
 }

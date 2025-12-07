@@ -7,6 +7,8 @@ import { projectManager } from "@/shared/services/project-manager.service";
 import { ParameterWithReference, NodeReference } from "../types/node-connection.types";
 import { resolveAllParameters, getAvailableNodeReferences, getAvailableNodeReferencesExtended } from "../utils/node-reference.utils";
 import { useLogStore } from "@/shared/store/use-log-store";
+import { ApiExecutionService } from "./api-execution.service";
+import type { ApiNodeData } from "@/shared/components/settings-modal/types";
 
 /**
  * DagService is a singleton service that manages the Directed Acyclic Graph (DAG) data.
@@ -27,7 +29,7 @@ class DagService {
     indgree: number;
   }[] = [];
 
-  private graphNodeData: Node<FileNodeData>[] = [];
+  private graphNodeData: Node<any>[] = [];
   private graphEdgeData: Edge[] = [
 
   ];
@@ -87,7 +89,7 @@ class DagService {
     return {};
   }
 
-  public getNodeData(): Node<FileNodeData>[] {
+  public getNodeData(): Node<any>[] {
     // Logic to retrieve node data
     return this.graphNodeData;
   }
@@ -143,7 +145,7 @@ class DagService {
     }
   }
 
-  public addNode(nodeData: Node<FileNodeData>): void {
+  public addNode(nodeData: Node<any>): void {
     this.graphNodeData.push(nodeData);
     this.graphAdjacencyList.set(nodeData.id, []);
     console.log(`Node added: ${nodeData.id}`, nodeData);
@@ -198,6 +200,37 @@ class DagService {
       useNodeStore.getState().setNodeResult(nodeId,
         { status: "running" }
       );
+      
+      // API 노드 타입 체크
+      if ((node.data as any).type === 'api') {
+        console.log(`Running API node with id: ${nodeId}`);
+        try {
+          await ApiExecutionService.executeApiNode(nodeId, node.data as ApiNodeData);
+          
+          // 현재 노드 실행 완료 후 다음 노드들을 실행
+          const nextNodeIds = this.getNextNodeIds(nodeId);
+          console.log(`Next nodes to execute: ${nextNodeIds}`);
+          
+          for (const nextNodeId of nextNodeIds) {
+            console.log(`Triggering next node with id: ${nextNodeId}`);
+            await DagServiceInstance.runNode(nextNodeId);
+          }
+        } catch (error) {
+          console.error(`API node ${nodeId} execution failed:`, error);
+        }
+        return;
+      }
+      
+      // File 노드 실행 로직
+      if (!node.data.filePath || !node.data.fileName || !node.data.fileExtension) {
+        console.error(`Invalid file node data for node ${nodeId}`);
+        useNodeStore.getState().setNodeResult(nodeId, {
+          status: "error",
+          result: `Invalid file node data`,
+        });
+        return;
+      }
+      
       console.log(
         `Running node with id: ${nodeId}, filePath: ${node.data.filePath}, fileName: ${node.data.fileName}, fileExtension: ${node.data.fileExtension}` 
       );

@@ -2,6 +2,7 @@ export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateFileNode: (filePath: string, fileName: string, fileExtension: string) => string;
+  onCreateApiNode?: () => void;
 }
 
 export interface Project {
@@ -55,11 +56,77 @@ export interface ConfirmDialogState {
   onConfirm: () => void;
 }
 
-export interface ApiNodeData {
-  type: string;
-  url: string;
-  method: string;
+// HTTP Methods supported by API nodes
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+
+// Authentication types
+export type AuthType = 'none' | 'bearer' | 'basic' | 'api-key' | 'oauth2';
+
+export interface AuthConfig {
+  type: AuthType;
+  token?: string; // Bearer token
+  username?: string; // Basic auth
+  password?: string; // Basic auth
+  apiKey?: string;
+  apiKeyHeader?: string; // Header name for API key
+  oauth2?: {
+    accessToken?: string;
+    tokenType?: string;
+  };
+}
+
+// Body types for requests
+export type BodyType = 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary';
+
+export interface KeyValuePair {
+  key: string;
+  value: string;
   description?: string;
+  enabled: boolean;
+}
+
+export interface FormDataItem extends KeyValuePair {
+  type: 'text' | 'file';
+}
+
+export interface RequestBody {
+  type: BodyType;
+  raw?: string; // For JSON, XML, Text, etc.
+  formData?: FormDataItem[];
+  urlEncoded?: KeyValuePair[];
+}
+
+// Complete API Node Data matching Postman features
+export interface ApiNodeData {
+  type: 'api';
+  name: string;
+  description?: string;
+  
+  // Request configuration
+  method: HttpMethod;
+  url: string;
+  
+  // Query parameters
+  queryParams: KeyValuePair[];
+  
+  // Headers
+  headers: KeyValuePair[];
+  
+  // Authorization
+  auth: AuthConfig;
+  
+  // Request Body
+  body: RequestBody;
+  
+  // Scripts (using JavaScript)
+  preRequestScript?: string;
+  testScript?: string;
+  
+  // Timeout settings
+  timeout?: number; // in milliseconds
+  
+  // Response handling
+  followRedirects?: boolean;
 }
 
 export interface DbNodeData {

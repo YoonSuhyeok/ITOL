@@ -150,15 +150,7 @@ pub async fn execute_ts_command(params: execution::node_system::ExecuteFileParam
 
 #[command]
 pub async fn execute_api_command(params: execution::api_system::ExecuteApiParams) -> Result<String, String> {
-    if params.method == "GET" {
-        execution::api_system::get_api_call(&params.base_url, params.query.as_deref(), params.headers.as_deref(), params.body.as_deref()).await
-            .map_err(|e| e.to_string())
-    } else if params.method == "POST" {
-        execution::api_system::post_api_call(&params.base_url, params.query.as_deref(), params.headers.as_deref(), params.body.as_deref()).await
-            .map_err(|e| e.to_string())
-    } else {
-        Err("Invalid method".to_string())
-    }
+    execution::api_system::execute_api_request(params).await
 }
 
 // Project Manager Commands

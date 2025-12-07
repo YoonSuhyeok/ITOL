@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { invoke } from "@tauri-apps/api/core";
+import { Plus, Globe, Database } from "lucide-react";
 
 // 분리된 모듈들 import
 import type { 
@@ -36,7 +37,7 @@ import {
   NodeCreationForm
 } from './settings-modal/dialog-components';
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onCreateFileNode, onCreateApiNode }) => {
   const [activeSection, setActiveSection] = useState<MenuSection>('projects');
   const [activeNodeTab, setActiveNodeTab] = useState<NodeType>('file');
   const [fileCreationMode, setFileCreationMode] = useState<FileCreationMode>('select-existing');
@@ -417,17 +418,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               />
               
               <div className="mt-6">
-                <NodeCreationForm
-                  activeTab={activeNodeTab}
-                  projects={projects}
-                  selectedProjectId={selectedProjectId}
-                  selectedFile={selectedFileForNode}
-                  fileCreationMode={fileCreationMode}
-                  onProjectChange={handleProjectChange}
-                  onFileSelect={handleFileSelect}
-                  onFileCreationModeChange={setFileCreationMode}
-                  onCreateFileNode={handleCreateFileNode}
-                />
+                {activeNodeTab === 'file' && (
+                  <NodeCreationForm
+                    activeTab={activeNodeTab}
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    selectedFile={selectedFileForNode}
+                    fileCreationMode={fileCreationMode}
+                    onProjectChange={handleProjectChange}
+                    onFileSelect={handleFileSelect}
+                    onFileCreationModeChange={setFileCreationMode}
+                    onCreateFileNode={handleCreateFileNode}
+                  />
+                )}
+
+                {activeNodeTab === 'api' && (
+                  <div className="border rounded-lg p-8 bg-gray-50 text-center">
+                    <Globe className="h-16 w-16 mx-auto mb-4 text-blue-500" />
+                    <h4 className="font-semibold text-lg mb-2">API 노드 생성</h4>
+                    <p className="text-sm text-gray-600 mb-6">
+                      REST API 요청을 수행하는 노드를 생성합니다.
+                      <br />
+                      Postman과 유사한 인터페이스로 API를 설정할 수 있습니다.
+                    </p>
+                    <Button 
+                      onClick={() => {
+                        if (onCreateApiNode) {
+                          onCreateApiNode();
+                          onClose();
+                        }
+                      }}
+                      className="w-full"
+                      size="lg"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      API 노드 만들기
+                    </Button>
+                  </div>
+                )}
+
+                {activeNodeTab === 'db' && (
+                  <div className="border rounded-lg p-8 bg-gray-50 text-center">
+                    <Database className="h-16 w-16 mx-auto mb-4 text-purple-500" />
+                    <h4 className="font-semibold text-lg mb-2">데이터베이스 노드</h4>
+                    <p className="text-sm text-gray-600 mb-6">
+                      데이터베이스 쿼리 노드 기능은 곧 제공될 예정입니다.
+                    </p>
+                    <Button disabled className="w-full" size="lg">
+                      곧 출시 예정
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
