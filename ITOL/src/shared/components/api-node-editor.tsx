@@ -84,9 +84,23 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
 
   // 사용 가능한 이전 노드 참조 목록 가져오기
   const availableReferences = useMemo(() => {
+    console.log('[API Node Editor] Computing available references for node:', nodeId);
     if (!nodeId) return [];
     try {
-      return DagServiceInstance.getAvailableReferencesExtended(nodeId, true);
+      const refs = DagServiceInstance.getAvailableReferencesExtended(nodeId, true);
+      console.log('[API Node Editor] Available references (before dedup):', refs);
+      
+      // Deduplicate by nodeId.field combination
+      const uniqueRefs = refs.reduce((acc, ref) => {
+        const key = `${ref.nodeId}.${ref.field}`;
+        if (!acc.some(r => `${r.nodeId}.${r.field}` === key)) {
+          acc.push(ref);
+        }
+        return acc;
+      }, [] as typeof refs);
+      
+      console.log('[API Node Editor] Available references (after dedup):', uniqueRefs);
+      return uniqueRefs;
     } catch (e) {
       console.error('Failed to get available references:', e);
       return [];
@@ -305,7 +319,7 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
                                       {availableReferences.map((ref) => (
                                         <CommandItem
                                           key={`${ref.nodeId}-${ref.field}`}
-                                          value={ref.displayPath}
+                                          value={`${ref.nodeId}.${ref.field}`}
                                           onSelect={() => {
                                             updateKeyValuePair('pathParams', index, 'value', `{{${ref.nodeId}.${ref.field}}}`);
                                             setOpenReferencePopover(null);
@@ -400,7 +414,7 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
                                   {availableReferences.map((ref) => (
                                     <CommandItem
                                       key={`${ref.nodeId}-${ref.field}`}
-                                      value={ref.displayPath}
+                                      value={`${ref.nodeId}.${ref.field}`}
                                       onSelect={() => {
                                         updateKeyValuePair('queryParams', index, 'value', `{{${ref.nodeId}.${ref.field}}}`);
                                         setOpenReferencePopover(null);
@@ -629,7 +643,7 @@ export const ApiNodeEditor: React.FC<ApiNodeEditorProps> = ({
                                   {availableReferences.map((ref) => (
                                     <CommandItem
                                       key={`${ref.nodeId}-${ref.field}`}
-                                      value={ref.displayPath}
+                                      value={`${ref.nodeId}.${ref.field}`}
                                       onSelect={() => {
                                         updateKeyValuePair('headers', index, 'value', `{{${ref.nodeId}.${ref.field}}}`);
                                         setOpenReferencePopover(null);

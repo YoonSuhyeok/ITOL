@@ -141,6 +141,31 @@ class DagService {
     }
   }
 
+  public setNodesAndEdges(nodes: Node<any>[], edges: Edge[]): void {
+    console.log('[setNodesAndEdges] Clearing existing data...');
+    // Clear existing data
+    this.graphNodeData = [];
+    this.graphEdgeData = [];
+    this.graphAdjacencyList.clear();
+    
+    console.log('[setNodesAndEdges] Setting new nodes:', nodes.map(n => n.id));
+    // Set new nodes
+    this.graphNodeData = nodes;
+    
+    console.log('[setNodesAndEdges] Setting new edges:', edges.map(e => `${e.source}->${e.target}`));
+    // Set new edges (with cycle check)
+    if(this.isCyclic(edges)) {
+      throw Error("Cyclic dependency detected in the edges. Please check the graph structure.");
+    }
+    this.graphEdgeData = edges;
+    
+    // Rebuild graph structure
+    console.log('[setNodesAndEdges] Rebuilding graph structure...');
+    this.initDagGraph();
+    console.log('[setNodesAndEdges] Graph reloaded with', nodes.length, 'nodes and', edges.length, 'edges');
+    console.log('[setNodesAndEdges] Adjacency List:', this.graphAdjacencyList);
+  }
+
   public addNode(nodeData: Node<any>): void {
     this.graphNodeData.push(nodeData);
     this.graphAdjacencyList.set(nodeData.id, []);
@@ -204,6 +229,17 @@ class DagService {
     // Logic to run a specific node in the DAG
     const node = this.graphNodeData.find((n) => n.id === nodeId);
     if (node) {
+      // Skip if already running or completed successfully
+      const currentResult = useNodeStore.getState().nodeResults[nodeId];
+      if (currentResult?.status === 'running') {
+        console.log(`Node ${nodeId} is already running, skipping...`);
+        return;
+      }
+      if (currentResult?.status === 'success') {
+        console.log(`Node ${nodeId} already completed successfully, skipping...`);
+        return;
+      }
+      
       useNodeStore.getState().setNodeResult(nodeId,
         { status: "running" }
       );
@@ -214,8 +250,8 @@ class DagService {
         try {
           await ApiExecutionService.executeApiNode(nodeId, node.data as ApiNodeData);
           
-          // 현재 노드 실행 완료 후 다음 노드들을 실행
-          const nextNodeIds = this.getNextNodeIds(nodeId);
+          // 현재 노드 실행 완료 후 다음 노드들을 실행 (중복 제거)
+          const nextNodeIds = [...new Set(this.getNextNodeIds(nodeId))];
           console.log(`Next nodes to execute: ${nextNodeIds}`);
           
           for (const nextNodeId of nextNodeIds) {
@@ -234,8 +270,8 @@ class DagService {
         try {
           await DbExecutionService.executeDbNode(nodeId, node.data as DbNodeData);
           
-          // 현재 노드 실행 완료 후 다음 노드들을 실행
-          const nextNodeIds = this.getNextNodeIds(nodeId);
+          // 현재 노드 실행 완료 후 다음 노드들을 실행 (중복 제거)
+          const nextNodeIds = [...new Set(this.getNextNodeIds(nodeId))];
           console.log(`Next nodes to execute: ${nextNodeIds}`);
           
           for (const nextNodeId of nextNodeIds) {
@@ -341,8 +377,8 @@ class DagService {
           result: result,
         });
         
-        // 현재 노드 실행 완료 후 다음 노드들을 실행
-        const nextNodeIds = this.getNextNodeIds(nodeId);
+        // 현재 노드 실행 완료 후 다음 노드들을 실행 (중복 제거)
+        const nextNodeIds = [...new Set(this.getNextNodeIds(nodeId))];
         console.log(`Next nodes to execute: ${nextNodeIds}`);
         
         for (const nextNodeId of nextNodeIds) {

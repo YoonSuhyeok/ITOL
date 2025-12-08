@@ -4,6 +4,8 @@ use tokio::sync::OnceCell;
 
 pub mod book;
 pub mod page;
+pub mod node;
+pub mod edge;
 
 pub fn get_sqlite_path() -> String {
     // 앱 데이터 디렉터리 가져오기 (Windows에서는 %APPDATA%, Linux에서는 ~/.config, macOS에서는 ~/Library/Application Support)

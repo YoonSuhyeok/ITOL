@@ -20,13 +20,21 @@ function resolveReferences(value: string): string {
     const nodeId = parts[0];
     const path = parts.slice(1).join('.');
     
+    console.log('[resolveReferences] Resolving reference:', reference);
+    console.log('[resolveReferences] Node ID:', nodeId);
+    console.log('[resolveReferences] Path:', path);
+    
     const nodeResult = nodeResults[nodeId];
+    console.log('[resolveReferences] Node result:', nodeResult);
+    
     if (!nodeResult || nodeResult.status !== 'success') {
       console.warn(`[resolveReferences] Node ${nodeId} has not been executed successfully`);
       return match;
     }
     
     const extractedValue = extractValueFromPath(nodeResult, path);
+    console.log('[resolveReferences] Extracted value:', extractedValue);
+    
     if (extractedValue === null || extractedValue === undefined) {
       console.warn(`[resolveReferences] Could not extract value from path: ${path}`);
       return match;
@@ -74,15 +82,20 @@ export class ApiExecutionService {
     try {
       // Resolve references in URL
       let finalUrl = resolveReferences(data.url);
+      console.log('[API Execution] Original URL:', data.url);
+      console.log('[API Execution] Resolved URL:', finalUrl);
       
       // Replace path parameters in URL (e.g., {petId} -> 123)
       if (data.pathParams && data.pathParams.length > 0) {
+        console.log('[API Execution] Path Params:', data.pathParams);
         data.pathParams
           .filter(param => param.enabled && param.value)
           .forEach(param => {
             const resolvedValue = resolveReferences(param.value);
+            console.log(`[API Execution] Replacing {${param.key}} with:`, resolvedValue);
             finalUrl = finalUrl.replace(`{${param.key}}`, encodeURIComponent(resolvedValue));
           });
+        console.log('[API Execution] Final URL after path params:', finalUrl);
       }
 
       // Build URL with query parameters (with reference resolution)
@@ -236,11 +249,13 @@ export class ApiExecutionService {
         nodeId: nodeId,
         nodeName: data.name,
         status: isSuccess ? 'success' : 'error',
-        data: result,
+        result: result, // Wrap response in 'result' field for reference access
         error: isSuccess ? null : `HTTP ${result.status}: ${result.statusText}`,
         executionTime,
         stdout: JSON.stringify(result, null, 2),
       };
+
+      console.log('[API Execution] Saving result:', finalResult);
 
       useNodeStore.getState().setNodeResult(nodeId, finalResult);
       
@@ -260,7 +275,7 @@ export class ApiExecutionService {
         nodeId: nodeId,
         nodeName: data.name,
         status: 'error',
-        data: null,
+        result: null, // Keep consistent structure with success case
         error: error.message || error.toString() || 'Unknown error occurred',
         executionTime,
         stderr: error.stack || error.message || error.toString(),

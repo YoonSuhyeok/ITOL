@@ -63,7 +63,15 @@ pub fn run() {
             command::update_page_command,
             command::delete_page_command,
             command::reorder_pages_command,
-            command::debug_get_all_pages_command
+            command::debug_get_all_pages_command,
+            command::get_nodes_by_page_id_command,
+            command::create_node_command,
+            command::update_node_command,
+            command::delete_node_command,
+            command::get_edges_by_page_id_command,
+            command::create_edge_command,
+            command::update_edge_command,
+            command::delete_edge_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

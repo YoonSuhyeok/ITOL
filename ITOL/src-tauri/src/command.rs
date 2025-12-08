@@ -367,3 +367,90 @@ pub async fn reorder_pages_command(
         .await
         .map_err(|e| e.to_string())
 }
+
+// ==================== Node Commands ====================
+
+#[command]
+pub async fn get_nodes_by_page_id_command(page_id: i32) -> Result<Vec<database::node::Node>, String> {
+    database::node::get_nodes_by_page_id(page_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn create_node_command(
+    id: String,
+    fk_page_id: i32,
+    data: String,
+    node_type: String,
+    position_x: i32,
+    position_y: i32,
+) -> Result<(), String> {
+    database::node::create_node(id, fk_page_id, data, node_type, position_x, position_y)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn update_node_command(
+    id: String,
+    fk_page_id: i32,
+    data: String,
+    node_type: String,
+    position_x: i32,
+    position_y: i32,
+) -> Result<(), String> {
+    database::node::update_node(id, fk_page_id, data, node_type, position_x, position_y)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn delete_node_command(id: String, fk_page_id: i32) -> Result<(), String> {
+    database::node::delete_node(id, fk_page_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ==================== Edge Commands ====================
+
+#[command]
+pub async fn get_edges_by_page_id_command(page_id: i32) -> Result<Vec<database::edge::Edge>, String> {
+    database::edge::get_edges_by_page_id(page_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn create_edge_command(
+    fk_page_id: i32,
+    source: String,
+    target: String,
+    source_handle: Option<String>,
+    target_handle: Option<String>,
+) -> Result<i32, String> {
+    database::edge::create_edge(fk_page_id, source, target, source_handle, target_handle)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn update_edge_command(
+    id: i32,
+    fk_page_id: i32,
+    source: String,
+    target: String,
+    source_handle: Option<String>,
+    target_handle: Option<String>,
+) -> Result<(), String> {
+    database::edge::update_edge(id, fk_page_id, source, target, source_handle, target_handle)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn delete_edge_command(id: i32, fk_page_id: i32) -> Result<(), String> {
+    database::edge::delete_edge(id, fk_page_id)
+        .await
+        .map_err(|e| e.to_string())
+}

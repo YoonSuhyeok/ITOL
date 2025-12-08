@@ -47,13 +47,14 @@ export default function App() {
 function FlowCanvas() {
 	// const nodes: Node<FileNodeData>[] = DagServiceInstance.getNodeData();
 	// const edges = DagServiceInstance.getEdgeData();
-	const [nodes, setNodes, onNodesChange] = useNodesState(DagServiceInstance.getNodeData());
-	const [edges, setEdges, onEdgesChange] = useEdgesState(DagServiceInstance.getEdgeData());
+	const [nodes, setNodes, onNodesChangeInternal] = useNodesState(DagServiceInstance.getNodeData());
+	const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(DagServiceInstance.getEdgeData());
 	const { screenToFlowPosition } = useReactFlow();
 
 	// File Explorer & Tabs state
 	const [tabs, setTabs] = useState<Tab[]>([]);
 	const [activeTabId, setActiveTabId] = useState<string>("");
+	const [currentPageId, setCurrentPageId] = useState<number | null>(null);
 	const [selectedFileId, setSelectedFileId] = useState<string>();
 	const [fileItems, setFileItems] = useState<FileItem[]>([]);
 	const [books, setBooks] = useState<Book[]>([]);
@@ -68,6 +69,85 @@ function FlowCanvas() {
 	
 	// Node creation dialog state (File node only)
 	const [nodeCreationDialogOpen, setNodeCreationDialogOpen] = useState(false);
+
+	// Custom node change handler to track deletions
+	const onNodesChange = useCallback((changes: any[]) => {
+		// Handle deletions
+		const removedNodes = changes.filter(change => change.type === 'remove');
+		if (removedNodes.length > 0 && currentPageId) {
+			removedNodes.forEach(change => {
+				console.log('[onNodesChange] Deleting node from DB:', change.id);
+				invoke('delete_node_command', {
+					id: change.id,
+					fkPageId: currentPageId
+				}).then(() => {
+					console.log('[onNodesChange] Successfully deleted node from DB:', change.id);
+				}).catch(error => {
+					console.error('[onNodesChange] Failed to delete node from DB:', error);
+				});
+			});
+		}
+		
+		// Apply changes to ReactFlow
+		onNodesChangeInternal(changes);
+	}, [currentPageId, onNodesChangeInternal]);
+
+	// Custom edge change handler to track deletions
+	const onEdgesChange = useCallback((changes: any[]) => {
+		// Handle deletions
+		const removedEdges = changes.filter(change => change.type === 'remove');
+		if (removedEdges.length > 0 && currentPageId) {
+			removedEdges.forEach(change => {
+				// Extract edge ID from "edge-123" format
+				const edgeId = change.id.replace('edge-', '');
+				console.log('[onEdgesChange] Deleting edge from DB:', edgeId);
+				invoke('delete_edge_command', {
+					id: Number.parseInt(edgeId),
+					fkPageId: currentPageId
+				}).then(() => {
+					console.log('[onEdgesChange] Successfully deleted edge from DB:', edgeId);
+				}).catch(error => {
+					console.error('[onEdgesChange] Failed to delete edge from DB:', error);
+				});
+			});
+		}
+		
+		// Apply changes to ReactFlow
+		onEdgesChangeInternal(changes);
+	}, [currentPageId, onEdgesChangeInternal]);
+
+	// 노드 변경 시 DB 업데이트 (debounce 적용)
+	useEffect(() => {
+		if (!currentPageId) return;
+		
+		const timer = setTimeout(() => {
+			// 노드 위치 변경을 DB에 반영
+			nodes.forEach(node => {
+				invoke('update_node_command', {
+					id: node.id,
+					fkPageId: currentPageId,
+					data: JSON.stringify(node.data),
+					nodeType: node.type || 'languageNode',
+					positionX: Math.round(node.position.x),
+					positionY: Math.round(node.position.y)
+				}).catch(error => {
+					// 새 노드인 경우 create 시도
+					if (error.toString().includes('no rows')) {
+						invoke('create_node_command', {
+							id: node.id,
+							fkPageId: currentPageId,
+							data: JSON.stringify(node.data),
+							nodeType: node.type || 'languageNode',
+							positionX: Math.round(node.position.x),
+							positionY: Math.round(node.position.y)
+						}).catch(err => console.error('Failed to create node:', err));
+					}
+				});
+			});
+		}, 500); // 500ms debounce
+		
+		return () => clearTimeout(timer);
+	}, [nodes, currentPageId]);
 	
 	// Load books and pages from database
 	useEffect(() => {
@@ -98,15 +178,55 @@ function FlowCanvas() {
 					};
 					setTabs([newTab]);
 					setActiveTabId(newTab.id);
+					setCurrentPageId(firstPage.id);
 					
-					// Load flow data if exists
-					if (firstPage.flow_data) {
-						try {
-							const flowData = JSON.parse(firstPage.flow_data);
-							setNodes(flowData.nodes || []);
-							setEdges(flowData.edges || []);
-						} catch (e) {
-							console.error("Failed to parse flow data:", e);
+					// Load nodes and edges from DB
+					try {
+						const dbNodes = await invoke<any[]>('get_nodes_by_page_id_command', { pageId: firstPage.id });
+						const dbEdges = await invoke<any[]>('get_edges_by_page_id_command', { pageId: firstPage.id });
+						
+						console.log('[Initial Load] Raw DB nodes:', dbNodes);
+						
+						// Convert DB nodes to ReactFlow format
+						const flowNodes = dbNodes.map(dbNode => {
+							const node = {
+								id: dbNode.id,
+								type: dbNode.node_type,
+								position: { x: dbNode.position_x, y: dbNode.position_y },
+								data: JSON.parse(dbNode.data)
+							};
+							console.log('[Initial Load] Converted node:', { id: node.id, type: node.type, data: node.data });
+							return node;
+						});
+						
+						// Convert DB edges to ReactFlow format
+						const flowEdges = dbEdges.map(dbEdge => ({
+							id: `edge-${dbEdge.id}`,
+							source: dbEdge.source,
+							target: dbEdge.target,
+							sourceHandle: dbEdge.source_handle,
+							targetHandle: dbEdge.target_handle,
+							markerEnd: { type: 'arrowclosed' as any }
+						}));
+						
+						setNodes(flowNodes);
+						setEdges(flowEdges);
+						
+						// Register all nodes and edges in DAG service
+						DagServiceInstance.setNodesAndEdges(flowNodes, flowEdges);
+						
+						console.log('[Initial Load] Loaded from DB:', { nodes: flowNodes.length, edges: flowEdges.length });
+					} catch (error) {
+						console.error('[Initial Load] Failed to load from DB:', error);
+						// Fallback to flow_data if DB load fails
+						if (firstPage.flow_data) {
+							try {
+								const flowData = JSON.parse(firstPage.flow_data);
+								setNodes(flowData.nodes || []);
+								setEdges(flowData.edges || []);
+							} catch (e) {
+								console.error("Failed to parse flow data:", e);
+							}
 						}
 					}
 				}
@@ -350,6 +470,7 @@ function FlowCanvas() {
 			};
 			setTabs(prev => [...prev, newTab]);
 			setActiveTabId(newTab.id);
+			setCurrentPageId(newPageId);
 			
 			// Clear nodes and edges for new page
 			setNodes([]);
@@ -612,7 +733,7 @@ function FlowCanvas() {
 	}, [books, pages]);
 
 	// File click handler
-	const handleFileClick = useCallback((item: FileItem) => {
+	const handleFileClick = useCallback(async (item: FileItem) => {
 		setSelectedFileId(item.id);
 		
 		if (item.type === "folder" && item.id.startsWith("book-")) {
@@ -639,50 +760,134 @@ function FlowCanvas() {
 				saveCurrentFlow();
 			}
 			
-			// Load the page's flow data
+			// Load the page's data from DB
 			const pageId = Number.parseInt(item.id.replace("page-", ""));
-			const page = pages.find(p => p.id === pageId);
-			if (page && page.flow_data) {
-				try {
-					const flowData = JSON.parse(page.flow_data);
-					setNodes(flowData.nodes || []);
-					setEdges(flowData.edges || []);
-				} catch (e) {
-					console.error("Failed to parse flow data:", e);
+			try {
+				const dbNodes = await invoke<any[]>('get_nodes_by_page_id_command', { pageId });
+				const dbEdges = await invoke<any[]>('get_edges_by_page_id_command', { pageId });
+				
+				console.log('[File Double Click] Raw DB nodes:', dbNodes);
+				
+				// Convert DB nodes to ReactFlow format
+				const flowNodes = dbNodes.map(dbNode => {
+					const node = {
+						id: dbNode.id,
+						type: dbNode.node_type,
+						position: { x: dbNode.position_x, y: dbNode.position_y },
+						data: JSON.parse(dbNode.data)
+					};
+					console.log('[File Double Click] Converted node:', { id: node.id, type: node.type, data: node.data });
+					return node;
+				});
+				
+				// Convert DB edges to ReactFlow format
+				const flowEdges = dbEdges.map(dbEdge => ({
+					id: `edge-${dbEdge.id}`,
+					source: dbEdge.source,
+					target: dbEdge.target,
+					sourceHandle: dbEdge.source_handle,
+					targetHandle: dbEdge.target_handle,
+					markerEnd: { type: 'arrowclosed' as any }
+				}));
+				
+				setNodes(flowNodes);
+				setEdges(flowEdges);
+				
+				// Register all nodes and edges in DAG service
+				DagServiceInstance.setNodesAndEdges(flowNodes, flowEdges);
+				
+				console.log('[File Double Click] Loaded from DB:', { pageId, nodes: flowNodes.length, edges: flowEdges.length });
+			} catch (error) {
+				console.error('[File Double Click] Failed to load from DB:', error);
+				// Fallback to flow_data
+				const page = pages.find(p => p.id === pageId);
+				if (page && page.flow_data) {
+					try {
+						const flowData = JSON.parse(page.flow_data);
+						setNodes(flowData.nodes || []);
+						setEdges(flowData.edges || []);
+					} catch (e) {
+						console.error("Failed to parse flow data:", e);
+						setNodes([]);
+						setEdges([]);
+					}
+				} else {
 					setNodes([]);
 					setEdges([]);
 				}
-			} else {
-				setNodes([]);
-				setEdges([]);
 			}
+			
+			// Update current page ID
+			setCurrentPageId(pageId);
 			
 			setActiveTabId(item.id);
 		}
 	}, [tabs, pages, activeTabId, saveCurrentFlow, setNodes, setEdges]);
 
 	// Tab handlers
-	const handleTabClick = useCallback((tabId: string) => {
+	const handleTabClick = useCallback(async (tabId: string) => {
 		if (activeTabId !== tabId) {
 			// Save current flow before switching
 			saveCurrentFlow();
 			
-			// Load the new tab's flow data
+			// Update current page ID
 			const pageId = Number.parseInt(tabId.replace("page-", ""));
-			const page = pages.find(p => p.id === pageId);
-			if (page && page.flow_data) {
-				try {
-					const flowData = JSON.parse(page.flow_data);
-					setNodes(flowData.nodes || []);
-					setEdges(flowData.edges || []);
-				} catch (e) {
-					console.error("Failed to parse flow data:", e);
+			setCurrentPageId(pageId);
+			
+			// Load nodes and edges from DB
+			try {
+				const dbNodes = await invoke<any[]>('get_nodes_by_page_id_command', { pageId });
+				const dbEdges = await invoke<any[]>('get_edges_by_page_id_command', { pageId });
+				
+				console.log('[Tab Switch] Raw DB nodes:', dbNodes);
+				
+				// Convert DB nodes to ReactFlow format
+				const flowNodes = dbNodes.map(dbNode => {
+					const node = {
+						id: dbNode.id,
+						type: dbNode.node_type,
+						position: { x: dbNode.position_x, y: dbNode.position_y },
+						data: JSON.parse(dbNode.data)
+					};
+					console.log('[Tab Switch] Converted node:', { id: node.id, type: node.type, data: node.data });
+					return node;
+				});
+				
+				// Convert DB edges to ReactFlow format
+				const flowEdges = dbEdges.map(dbEdge => ({
+					id: `edge-${dbEdge.id}`,
+					source: dbEdge.source,
+					target: dbEdge.target,
+					sourceHandle: dbEdge.source_handle,
+					targetHandle: dbEdge.target_handle,
+					markerEnd: { type: 'arrowclosed' as any }
+				}));
+				
+				setNodes(flowNodes);
+				setEdges(flowEdges);
+				
+				// Register all nodes and edges in DAG service
+				DagServiceInstance.setNodesAndEdges(flowNodes, flowEdges);
+				
+				console.log('[Tab Switch] Loaded from DB:', { pageId, nodes: flowNodes.length, edges: flowEdges.length });
+			} catch (error) {
+				console.error('[Tab Switch] Failed to load from DB:', error);
+				// Fallback to flow_data
+				const page = pages.find(p => p.id === pageId);
+				if (page && page.flow_data) {
+					try {
+						const flowData = JSON.parse(page.flow_data);
+						setNodes(flowData.nodes || []);
+						setEdges(flowData.edges || []);
+					} catch (e) {
+						console.error("Failed to parse flow data:", e);
+						setNodes([]);
+						setEdges([]);
+					}
+				} else {
 					setNodes([]);
 					setEdges([]);
 				}
-			} else {
-				setNodes([]);
-				setEdges([]);
 			}
 			
 			setActiveTabId(tabId);
@@ -785,10 +990,11 @@ function FlowCanvas() {
 		// 파일 확장자를 ts/js로 매핑
 		const mappedExtension = (fileExtension === 'tsx' || fileExtension === 'ts') ? 'ts' : 'js';
 		
+		const position = { x: Math.random() * 400, y: Math.random() * 400 };
 		const newNode = {
 			id: newNodeId,
 			type: 'languageNode',
-			position: { x: Math.random() * 400, y: Math.random() * 400 }, // 랜덤 위치
+			position,
 			data: {
 				fileName: fileName.split('.')[0], // 확장자 제거
 				fileExtension: mappedExtension as any,
@@ -802,33 +1008,75 @@ function FlowCanvas() {
 		// DagService에도 동기화
 		DagServiceInstance.addNode(newNode);
 		
+		// DB에 저장 (백그라운드)
+		console.log('[createFileNode] Saving to DB:', { newNodeId, currentPageId, nodeType: newNode.type });
+		if (currentPageId) {
+			invoke('create_node_command', {
+				id: newNodeId,
+				fkPageId: currentPageId,
+				data: JSON.stringify(newNode.data),
+				nodeType: newNode.type,
+				positionX: Math.round(position.x),
+				positionY: Math.round(position.y)
+			}).then(() => {
+				console.log('[createFileNode] Successfully saved to DB:', newNodeId);
+			}).catch(error => {
+				console.error('[createFileNode] Failed to save node to DB:', error);
+			});
+		} else {
+			console.warn('[createFileNode] No currentPageId, skipping DB save');
+		}
+		
 		return newNodeId;
-	}, [setNodes]);
+	}, [setNodes, currentPageId]);
 
 	// API 노드 생성 함수
 	const createApiNode = useCallback((apiData: ApiNodeData) => {
 		const newNodeId = `api-node-${Date.now()}`;
+		const position = { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 };
 		const newNode: any = {
 			id: newNodeId,
 			type: 'apiNode',
-			position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+			position,
 			data: apiData
 		};
 		
 		setNodes((nds: any) => [...nds, newNode]);
 		DagServiceInstance.addNode(newNode as any);
 		
+		// DB에 저장 (백그라운드)
+		console.log('[createApiNode] Saving to DB:', { newNodeId, currentPageId });
+		if (currentPageId) {
+			invoke('create_node_command', {
+				id: newNodeId,
+				fkPageId: currentPageId,
+				data: JSON.stringify(apiData),
+				nodeType: 'apiNode',
+				positionX: Math.round(position.x),
+				positionY: Math.round(position.y)
+			}).then(() => {
+				console.log('[createApiNode] Successfully saved to DB:', newNodeId);
+			}).catch(error => {
+				console.error('[createApiNode] Failed to save API node to DB:', error);
+			});
+		} else {
+			console.warn('[createApiNode] No currentPageId, skipping DB save');
+		}
+		
 		return newNodeId;
-	}, [setNodes]);
+	}, [setNodes, currentPageId]);
 
 	// API 노드 업데이트 함수
 	const updateApiNode = useCallback((nodeId: string, apiData: ApiNodeData) => {
+		let nodePosition = { x: 0, y: 0 };
 		setNodes((nds: any) => 
-			nds.map((node: any) => 
-				node.id === nodeId 
-					? { ...node, data: apiData }
-					: node
-			)
+			nds.map((node: any) => {
+				if (node.id === nodeId) {
+					nodePosition = node.position;
+					return { ...node, data: apiData };
+				}
+				return node;
+			})
 		);
 		// DagService에도 업데이트 반영
 		const updatedNode = {
@@ -837,32 +1085,67 @@ function FlowCanvas() {
 			data: apiData
 		};
 		DagServiceInstance.updateNode(updatedNode as any);
-	}, [setNodes]);
+		
+		// DB에 저장 (백그라운드)
+		if (currentPageId) {
+			invoke('update_node_command', {
+				id: nodeId,
+				fkPageId: currentPageId,
+				data: JSON.stringify(apiData),
+				nodeType: 'apiNode',
+				positionX: Math.round(nodePosition.x),
+				positionY: Math.round(nodePosition.y)
+			}).catch(error => console.error('Failed to update API node in DB:', error));
+		}
+	}, [setNodes, currentPageId]);
 
 	// DB 노드 생성 함수
 	const createDbNode = useCallback((dbData: DbNodeData) => {
 		const newNodeId = `db-node-${Date.now()}`;
+		const position = { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 };
 		const newNode: any = {
 			id: newNodeId,
 			type: 'dbNode',
-			position: { x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 },
+			position,
 			data: dbData
 		};
 		
 		setNodes((nds: any) => [...nds, newNode]);
 		DagServiceInstance.addNode(newNode as any);
 		
+		// DB에 저장 (백그라운드)
+		console.log('[createDbNode] Saving to DB:', { newNodeId, currentPageId });
+		if (currentPageId) {
+			invoke('create_node_command', {
+				id: newNodeId,
+				fkPageId: currentPageId,
+				data: JSON.stringify(dbData),
+				nodeType: 'dbNode',
+				positionX: Math.round(position.x),
+				positionY: Math.round(position.y)
+			}).then(() => {
+				console.log('[createDbNode] Successfully saved to DB:', newNodeId);
+			}).catch(error => {
+				console.error('[createDbNode] Failed to save DB node to DB:', error);
+			});
+		} else {
+			console.warn('[createDbNode] No currentPageId, skipping DB save');
+		}
+		
 		return newNodeId;
-	}, [setNodes]);
+	}, [setNodes, currentPageId]);
 
 	// DB 노드 업데이트 함수
 	const updateDbNode = useCallback((nodeId: string, dbData: DbNodeData) => {
+		let nodePosition = { x: 0, y: 0 };
 		setNodes((nds: any) => 
-			nds.map((node: any) => 
-				node.id === nodeId 
-					? { ...node, data: dbData }
-					: node
-			)
+			nds.map((node: any) => {
+				if (node.id === nodeId) {
+					nodePosition = node.position;
+					return { ...node, data: dbData };
+				}
+				return node;
+			})
 		);
 		// DagService에도 업데이트 반영
 		const updatedNode = {
@@ -871,7 +1154,19 @@ function FlowCanvas() {
 			data: dbData
 		};
 		DagServiceInstance.updateNode(updatedNode as any);
-	}, [setNodes]);
+		
+		// DB에 저장 (백그라운드)
+		if (currentPageId) {
+			invoke('update_node_command', {
+				id: nodeId,
+				fkPageId: currentPageId,
+				data: JSON.stringify(dbData),
+				nodeType: 'dbNode',
+				positionX: Math.round(nodePosition.x),
+				positionY: Math.round(nodePosition.y)
+			}).catch(error => console.error('Failed to update DB node in DB:', error));
+		}
+	}, [setNodes, currentPageId]);
 
 	// 노드 더블클릭 핸들러
 	const onNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -945,6 +1240,17 @@ function FlowCanvas() {
 			try {
 			  DagServiceInstance.setEdgeData(newEdges);
 			  console.log("Edge connection successful:", connection);
+			  
+			  // DB에 저장 (백그라운드)
+			  if (currentPageId && connection.source && connection.target) {
+				invoke('create_edge_command', {
+					fkPageId: currentPageId,
+					source: connection.source,
+					target: connection.target,
+					sourceHandle: connection.sourceHandle || null,
+					targetHandle: connection.targetHandle || null
+				}).catch(error => console.error('Failed to save edge to DB:', error));
+			  }
 			} catch (error) {
 			  console.error("Failed to add edge:", error);
 			  // 순환 참조 등의 오류가 발생하면 엣지 추가를 취소
@@ -954,7 +1260,7 @@ function FlowCanvas() {
 			return newEdges;
 		  });
 		},
-		[setEdges]
+		[setEdges, currentPageId]
 	  );
 
 	// 핸들을 빈 공간에 놓았을 때 새 노드 생성
