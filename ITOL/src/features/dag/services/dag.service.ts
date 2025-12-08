@@ -502,11 +502,11 @@ class DagService {
     const parameters: any[] = [];
     for(const frontNode of frontNodes) {
       const node = this.graphNodeData.find(n => n.id === frontNode);
-      if (node) {
+      if (node && node.data.requestProperties) {
         node.data.requestProperties.forEach((param: Parameter) => {
           parameters.push({
             ...param,
-            nodeName: node.data.fileName,
+            nodeName: node.data.fileName || node.data.name,
           });
         });
       }
@@ -548,6 +548,19 @@ class DagService {
     }
     
     console.log(`[setNodeParameters] Setting parameters for node ${nodeId}:`, parameters);
+    
+    // 각 파라미터의 상태 로깅
+    parameters.forEach((param, index) => {
+      console.log(`[setNodeParameters] Parameter ${index}:`, {
+        id: param.id,
+        key: param.key,
+        checked: param.checked,
+        value: param.value,
+        valueSource: param.valueSource,
+        referenceNodeId: param.referenceNodeId,
+        referencePath: param.referencePath
+      });
+    });
     
     // Parameter[]를 RequestProperty[]로 변환
     const requestProperties = parameters

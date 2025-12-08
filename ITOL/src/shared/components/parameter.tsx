@@ -531,14 +531,38 @@ const ValueSelector = ({
 
   // 사용 가능한 노드 참조 목록 가져오기
   useEffect(() => {
-    console.log(`[ValueSelector] Getting references for node ${nodeId}`);
-    const references = getAvailableNodeReferencesExtended(nodeId, 
-      DagServiceInstance.getNodeData(), 
-      DagServiceInstance.getEdgeData(),
-      true // 모든 성공한 노드 포함
-    );
-    console.log(`[ValueSelector] Got references:`, references);
-    setAvailableReferences(references);
+    console.log(`[ValueSelector] ===== Starting reference lookup for node ${nodeId} =====`);
+    try {
+      const nodeData = DagServiceInstance.getNodeData();
+      const edgeData = DagServiceInstance.getEdgeData();
+      
+      console.log(`[ValueSelector] Node data:`, nodeData);
+      console.log(`[ValueSelector] Edge data:`, edgeData);
+      
+      const references = getAvailableNodeReferencesExtended(nodeId, 
+        nodeData, 
+        edgeData,
+        true // 모든 성공한 노드 포함
+      );
+      console.log(`[ValueSelector] Got references (before dedup):`, references);
+      
+      // Deduplicate by nodeId.field combination
+      const uniqueRefs = references.reduce((acc, ref) => {
+        const key = `${ref.nodeId}.${ref.field}`;
+        if (!acc.some(r => `${r.nodeId}.${r.field}` === key)) {
+          acc.push(ref);
+        }
+        return acc;
+      }, [] as typeof references);
+      
+      console.log(`[ValueSelector] Got references (after dedup):`, uniqueRefs);
+      console.log(`[ValueSelector] Setting availableReferences to ${uniqueRefs.length} items`);
+      setAvailableReferences(uniqueRefs);
+    } catch (error) {
+      console.error('[ValueSelector] Error getting references:', error);
+      setAvailableReferences([]);
+    }
+    console.log(`[ValueSelector] ===== Finished reference lookup =====`);
   }, [nodeId]);
 
   // 모드 변경 핸들러

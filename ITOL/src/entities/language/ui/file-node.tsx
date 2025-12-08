@@ -23,7 +23,7 @@ import type FileNodeData from "../model/file-type";
 import FileViewModel from "../model/file-view-model";
 import { Badge } from "@/shared/components/ui/badge";
 import renderTypeDefinition from "@/shared/components/renderTypeDefinition";
-import ParameterForm from "@/shared/components/parameter";
+import { SimpleParameterForm, SimpleParameter } from "@/shared/components/simple-parameter-form";
 import { DagServiceInstance } from "@/features/dag/services/dag.service";
 import { useNodeStore } from "@/shared/store/use-node-store";
 
@@ -73,8 +73,63 @@ function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 		isBuilding,
 		setIsBuilding,
 	} = FileViewModel();
-	const [requestType, setRequestType] = useState()
-	const [responseType, setResponseType] = useState()
+
+	// 파라미터 상태 관리 (SimpleParameter 형식으로 변환)
+	const [parameters, setParameters] = useState<SimpleParameter[]>(() => {
+		// 기존 requestProperties를 SimpleParameter로 변환
+		if (data.requestProperties && Array.isArray(data.requestProperties)) {
+			return data.requestProperties.map((prop, index) => ({
+				id: `param-${index}-${Date.now()}`,
+				key: prop.key || '',
+				value: prop.referenceNodeId && prop.referencePath 
+					? `{{${prop.referenceNodeId}.${prop.referencePath}}}` 
+					: String(prop.value || '')
+			}));
+		}
+		return [];
+	});
+
+	// 파라미터 변경 핸들러
+	const handleParametersChange = (newParams: SimpleParameter[]) => {
+		setParameters(newParams);
+		
+		// DagService에 저장 (RequestProperty 형식으로 변환)
+		const requestProperties = newParams
+			.filter(p => p.key.trim() !== '')  // 키가 있는 것만
+			.map(p => {
+				// {{nodeId.field}} 형태인지 확인
+				const refMatch = p.value.match(/^\{\{(.+?)\.(.+?)\}\}$/);
+				if (refMatch) {
+					return {
+						nodeName: undefined,
+						key: p.key,
+						value: null,
+						type: 'string' as const,
+						description: 'Reference parameter',
+						referenceNodeId: refMatch[1],
+						referencePath: refMatch[2],
+						displayReference: p.value
+					};
+				}
+				return {
+					nodeName: undefined,
+					key: p.key,
+					value: p.value,
+					type: 'string' as const,
+					description: 'Direct value parameter'
+				};
+			});
+		
+		// 노드 데이터 업데이트
+		const nodeInDag = DagServiceInstance.getNodeData().find(n => n.id === node.id);
+		if (nodeInDag) {
+			nodeInDag.data.requestProperties = requestProperties;
+		}
+		
+		console.log(`[FileNode] Parameters updated for ${node.id}:`, requestProperties);
+	};
+	const [requestType] = useState<Record<string, unknown>>()
+	const [responseType] = useState<Record<string, unknown>>()
 
   const { nodeResults, removeNodeResult } = useNodeStore();
   const isRunning = nodeResults[node.id]?.status === "running";
@@ -275,7 +330,7 @@ function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 					Request Type
 					</Badge>
 					<pre className="bg-gray-100 p-2 rounded overflow-auto">
-					{renderTypeDefinition(requestType)}
+					{requestType ? renderTypeDefinition(requestType) : 'No type defined'}
 					</pre>
 				</div>
 				<div>
@@ -283,18 +338,19 @@ function FileNode({ setNodes, setEdges, ...node }: FileNodeProps) {
 					Response Type
 					</Badge>
 					<pre className="bg-gray-100 p-2 rounded overflow-auto">
-					{renderTypeDefinition(responseType)}
+					{responseType ? renderTypeDefinition(responseType) : 'No type defined'}
 					</pre>
 				</div>
 				</div>
 			)}
-			<ParameterForm 
-        nodeId={node.id}
-        isParameterSectionCollapsed={isParameterSectionCollapsed}
-        setIsParameterSectionCollapsed={setIsParameterSectionCollapsed}
-        parent_parameters={data.requestProperties}
-        isNodeMinimized={isNodeMinimized}>
-			</ParameterForm>
+			<SimpleParameterForm 
+				nodeId={node.id}
+				parameters={parameters}
+				onParametersChange={handleParametersChange}
+				isCollapsed={isParameterSectionCollapsed}
+				onCollapseChange={setIsParameterSectionCollapsed}
+				isMinimized={isNodeMinimized}
+			/>
 			{/* 입력 핸들 */}
 			<Handle
 				type="target"
